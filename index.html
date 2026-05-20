@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EdgeMind · Real-Time Operations Dashboard</title>
+  <meta name="description" content="EdgeMind AI-native infrastructure intelligence dashboard for edge-deployed Kubernetes clusters running ABB industrial condition monitoring.">
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+  <div class="dashboard-frame">
+
+    <!-- ══ NAVBAR ══════════════════════════════════════════════════ -->
+    <nav class="navbar">
+      <div class="navbar-left">
+        <div class="navbar-logo">
+          <img src="logo.png" alt="EdgeMind Logo">
+        </div>
+        <span class="navbar-brand">EdgeMind</span>
+      </div>
+
+      <div class="navbar-center">
+        <span>edge-node-01</span>
+        <span style="color:#666;">·</span>
+        <span>k3s v1.28</span>
+        <span class="pulsing-dot"></span>
+        <span class="live-badge">LIVE</span>
+      </div>
+
+      <div class="navbar-right">
+        <span id="navbar-clock" class="navbar-clock">2026-05-20 08:25:00</span>
+        <span class="navbar-badge">ABB Accelerator</span>
+        <span class="navbar-settings" title="Settings">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9"></path>
+          </svg>
+        </span>
+      </div>
+    </nav>
+
+    <!-- ══ DASHBOARD CONTENT ════════════════════════════════════════ -->
+    <div class="dashboard-content">
+
+      <!-- ── PANEL 1: Namespace Health ─────────────────────────── -->
+      <div class="namespaces-row">
+
+        <!-- kube-system -->
+        <div class="namespace-card">
+          <div class="namespace-header">
+            <span class="namespace-name">kube-system</span>
+            <span class="badge badge-healthy">Healthy</span>
+          </div>
+          <div class="namespace-pods">9 pods active</div>
+          <div class="namespace-sparklines">
+            <div class="sparkline-item"><span class="sparkline-label">CPU</span><svg id="spark-kube-system-cpu" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">MEM</span><svg id="spark-kube-system-mem" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">DSK</span><svg id="spark-kube-system-disk" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">NET</span><svg id="spark-kube-system-net" class="sparkline-svg"></svg></div>
+          </div>
+        </div>
+
+        <!-- abb-edgenius -->
+        <div class="namespace-card">
+          <div class="namespace-header">
+            <span class="namespace-name">abb-edgenius</span>
+            <span class="badge badge-healthy">Healthy</span>
+          </div>
+          <div class="namespace-pods">3 pods active</div>
+          <div class="namespace-sparklines">
+            <div class="sparkline-item"><span class="sparkline-label">CPU</span><svg id="spark-abb-edgenius-cpu" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">MEM</span><svg id="spark-abb-edgenius-mem" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">DSK</span><svg id="spark-abb-edgenius-disk" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">NET</span><svg id="spark-abb-edgenius-net" class="sparkline-svg"></svg></div>
+          </div>
+        </div>
+
+        <!-- abb-genix — CRITICAL -->
+        <div class="namespace-card ns-critical">
+          <div class="namespace-header">
+            <span class="namespace-name">abb-genix</span>
+            <span class="badge badge-critical">Critical <span class="alert-counter">2</span></span>
+          </div>
+          <div class="namespace-pods">4 pods active</div>
+          <div class="namespace-sparklines">
+            <div class="sparkline-item"><span class="sparkline-label">CPU</span><svg id="spark-abb-genix-cpu" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">MEM</span><svg id="spark-abb-genix-mem" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">DSK</span><svg id="spark-abb-genix-disk" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">NET</span><svg id="spark-abb-genix-net" class="sparkline-svg"></svg></div>
+          </div>
+        </div>
+
+        <!-- monitoring -->
+        <div class="namespace-card">
+          <div class="namespace-header">
+            <span class="namespace-name">monitoring</span>
+            <span class="badge badge-healthy">Healthy</span>
+          </div>
+          <div class="namespace-pods">5 pods active</div>
+          <div class="namespace-sparklines">
+            <div class="sparkline-item"><span class="sparkline-label">CPU</span><svg id="spark-monitoring-cpu" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">MEM</span><svg id="spark-monitoring-mem" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">DSK</span><svg id="spark-monitoring-disk" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">NET</span><svg id="spark-monitoring-net" class="sparkline-svg"></svg></div>
+          </div>
+        </div>
+
+        <!-- sensor-sim — DEGRADED -->
+        <div class="namespace-card ns-warning">
+          <div class="namespace-header">
+            <span class="namespace-name">sensor-sim</span>
+            <span class="badge badge-degraded">Degraded <span class="alert-counter" style="background:var(--warning);">1</span></span>
+          </div>
+          <div class="namespace-pods">4 pods active</div>
+          <div class="namespace-sparklines">
+            <div class="sparkline-item"><span class="sparkline-label">CPU</span><svg id="spark-sensor-sim-cpu" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">MEM</span><svg id="spark-sensor-sim-mem" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">DSK</span><svg id="spark-sensor-sim-disk" class="sparkline-svg"></svg></div>
+            <div class="sparkline-item"><span class="sparkline-label">NET</span><svg id="spark-sensor-sim-net" class="sparkline-svg"></svg></div>
+          </div>
+        </div>
+
+      </div><!-- /namespaces-row -->
+
+      <!-- ── MIDDLE ROW ─────────────────────────────────────────── -->
+      <div class="middle-row">
+
+        <!-- PANEL 2: Pod Resource Monitor -->
+        <div class="panel pod-monitor-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+              Pod Resource Monitor
+            </div>
+            <span style="font-family:var(--font-mono);font-size:9px;color:var(--text-muted);">25 PODS RUNNING</span>
+          </div>
+          <div class="table-container">
+            <table class="pod-table">
+              <thead>
+                <tr>
+                  <th>POD NAME</th>
+                  <th>NAMESPACE</th>
+                  <th>CPU</th>
+                  <th>MEMORY</th>
+                  <th>DISK</th>
+                  <th>NET</th>
+                  <th>ST</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- ▶ Critical Anomaly Pods -->
+                <tr class="row-highlight-anomaly">
+                  <td class="pod-name">anomaly-scorer</td>
+                  <td><span class="ns-pill ns-genix">abb-genix</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:87%;background:var(--critical);"></div></div>
+                      <span class="resource-val" style="color:var(--critical);font-weight:700;">87.3%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:82%;background:var(--critical);"></div></div>
+                      <span class="resource-val">82.1%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:45%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">45.3%</span>
+                    </div>
+                  </td>
+                  <td>1.8 MB/s</td>
+                  <td><span class="status-dot critical"></span></td>
+                </tr>
+
+                <tr class="row-highlight-anomaly">
+                  <td class="pod-name">data-historian</td>
+                  <td><span class="ns-pill ns-genix">abb-genix</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:52%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">52.4%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:65%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">64.8%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:78%;background:var(--critical);"></div></div>
+                      <span class="resource-val" style="color:var(--critical);font-weight:700;">78.1%</span>
+                    </div>
+                  </td>
+                  <td>2.4 MB/s</td>
+                  <td><span class="status-dot critical"></span></td>
+                </tr>
+
+                <tr class="row-highlight-anomaly">
+                  <td class="pod-name">motor-sim-2</td>
+                  <td><span class="ns-pill ns-sensor">sensor-sim</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:38%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">38.2%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:42%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">42.1%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:20%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">20.4%</span>
+                    </div>
+                  </td>
+                  <td>3.2 MB/s</td>
+                  <td><span class="status-dot critical"></span></td>
+                </tr>
+
+                <!-- ▶ Warning -->
+                <tr>
+                  <td class="pod-name">opc-ua-connector</td>
+                  <td><span class="ns-pill ns-edgenius">abb-edgenius</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:72%;background:var(--warning);"></div></div>
+                      <span class="resource-val" style="color:var(--warning);font-weight:700;">72.0%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:58%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">58.3%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:15%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">15.2%</span>
+                    </div>
+                  </td>
+                  <td>2.9 MB/s</td>
+                  <td><span class="status-dot warning"></span></td>
+                </tr>
+
+                <!-- ▶ Healthy pods -->
+                <tr>
+                  <td class="pod-name">model-server</td>
+                  <td><span class="ns-pill ns-genix">abb-genix</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:35%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">35.1%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:89%;background:var(--purple);"></div></div>
+                      <span class="resource-val">89.2%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:40%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">40.1%</span>
+                    </div>
+                  </td>
+                  <td>0.3 MB/s</td>
+                  <td><span class="status-dot healthy"></span></td>
+                </tr>
+                <tr>
+                  <td class="pod-name">feature-extractor</td>
+                  <td><span class="ns-pill ns-genix">abb-genix</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:45%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">45.0%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:52%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">52.1%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:33%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">33.4%</span>
+                    </div>
+                  </td>
+                  <td>1.1 MB/s</td>
+                  <td><span class="status-dot healthy"></span></td>
+                </tr>
+                <tr>
+                  <td class="pod-name">prometheus</td>
+                  <td><span class="ns-pill ns-monitoring">monitoring</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:28%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">28.4%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:72%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">72.1%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:54%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">54.2%</span>
+                    </div>
+                  </td>
+                  <td>0.8 MB/s</td>
+                  <td><span class="status-dot healthy"></span></td>
+                </tr>
+                <tr>
+                  <td class="pod-name">cloud-sync</td>
+                  <td><span class="ns-pill ns-edgenius">abb-edgenius</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:15%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">15.6%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:38%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">38.4%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:22%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">22.1%</span>
+                    </div>
+                  </td>
+                  <td>0.5 MB/s</td>
+                  <td><span class="status-dot healthy"></span></td>
+                </tr>
+                <tr>
+                  <td class="pod-name">alert-manager</td>
+                  <td><span class="ns-pill ns-monitoring">monitoring</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:18%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">18.2%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:44%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">44.6%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:30%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">30.8%</span>
+                    </div>
+                  </td>
+                  <td>0.4 MB/s</td>
+                  <td><span class="status-dot healthy"></span></td>
+                </tr>
+                <tr>
+                  <td class="pod-name">kube-scheduler</td>
+                  <td><span class="ns-pill ns-kube">kube-system</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:8%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">8.2%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:22%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">22.4%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:10%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">10.1%</span>
+                    </div>
+                  </td>
+                  <td>0.1 MB/s</td>
+                  <td><span class="status-dot healthy"></span></td>
+                </tr>
+                <tr>
+                  <td class="pod-name">coredns-1</td>
+                  <td><span class="ns-pill ns-kube">kube-system</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:5%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">5.1%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:18%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">18.3%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:8%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">8.4%</span>
+                    </div>
+                  </td>
+                  <td>0.2 MB/s</td>
+                  <td><span class="status-dot healthy"></span></td>
+                </tr>
+                <tr>
+                  <td class="pod-name">node-exporter-1</td>
+                  <td><span class="ns-pill ns-monitoring">monitoring</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:11%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">11.4%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:26%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">26.2%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:9%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">9.1%</span>
+                    </div>
+                  </td>
+                  <td>0.3 MB/s</td>
+                  <td><span class="status-dot healthy"></span></td>
+                </tr>
+                <tr>
+                  <td class="pod-name">motor-sim-1</td>
+                  <td><span class="ns-pill ns-sensor">sensor-sim</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:14%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">14.2%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:19%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">19.4%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:11%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">11.2%</span>
+                    </div>
+                  </td>
+                  <td>0.6 MB/s</td>
+                  <td><span class="status-dot healthy"></span></td>
+                </tr>
+                <tr>
+                  <td class="pod-name">motor-sim-3</td>
+                  <td><span class="ns-pill ns-sensor">sensor-sim</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:13%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">13.1%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:17%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">17.8%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:9%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">9.4%</span>
+                    </div>
+                  </td>
+                  <td>0.5 MB/s</td>
+                  <td><span class="status-dot healthy"></span></td>
+                </tr>
+                <tr>
+                  <td class="pod-name">ingress-nginx</td>
+                  <td><span class="ns-pill ns-kube">kube-system</span></td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:9%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">9.5%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:34%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">34.2%</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="resource-bar-wrapper">
+                      <div class="resource-bg"><div class="resource-fill" style="width:12%;background:var(--text-muted);"></div></div>
+                      <span class="resource-val">12.4%</span>
+                    </div>
+                  </td>
+                  <td>3.5 MB/s</td>
+                  <td><span class="status-dot healthy"></span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div><!-- /pod-monitor-panel -->
+
+        <!-- PANEL 3: Pipeline Dependency Graph -->
+        <div class="panel graph-panel">
+          <div class="panel-header">
+            <div class="panel-title" style="font-size:9px;color:var(--text-muted);">
+              Pipeline Dependency Graph · Auto-generated from Kubernetes metadata
+            </div>
+          </div>
+          <div class="graph-container">
+            <svg id="pipeline-graph-svg" width="100%" height="100%" viewBox="0 0 300 450" preserveAspectRatio="xMidYMid meet">
+
+              <defs>
+                <marker id="arrow-normal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#BEBEBE"/>
+                </marker>
+                <marker id="arrow-critical" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#FF1F3D"/>
+                </marker>
+                <marker id="arrow-warning" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#D97706"/>
+                </marker>
+              </defs>
+
+              <!-- Prometheus scrape lines (Dashed Blue connecting from side) -->
+              <path d="M 210 205 L 150 28"   class="edge-prometheus" />
+              <path d="M 210 205 L 150 88"   class="edge-prometheus" />
+              <path d="M 210 205 L 150 148"  class="edge-prometheus" />
+              <path d="M 210 205 L 150 208"  class="edge-prometheus" />
+              <path d="M 210 205 L 150 268"  class="edge-prometheus" />
+              <path d="M 210 205 L 150 328"  class="edge-prometheus" />
+              <path d="M 210 205 L 150 388"  class="edge-prometheus" />
+
+              <!-- Downward flow edges -->
+              <path d="M 80 46 L 80 70" class="edge-critical" marker-end="url(#arrow-critical)"/>
+              <path d="M 80 106 L 80 130" class="edge-warning" marker-end="url(#arrow-warning)"/>
+              <path d="M 80 166 L 80 190" class="edge-warning" marker-end="url(#arrow-warning)"/>
+              <path d="M 80 226 L 80 250" class="edge-normal" marker-end="url(#arrow-normal)"/>
+              <path d="M 80 286 L 80 310" class="edge-critical" marker-end="url(#arrow-critical)"/>
+              <path d="M 80 346 L 80 370" class="edge-normal" marker-end="url(#arrow-normal)"/>
+
+              <!-- Curved feedback loop at the bottom (matching user's drawing) -->
+              <path d="M 80 406 C 80 435, 15 435, 15 410" class="edge-normal" marker-end="url(#arrow-normal)" />
+
+              <!-- Prometheus floating side node -->
+              <g class="graph-node-group" transform="translate(210,190)">
+                <rect class="graph-node-rect" width="80" height="30" rx="3" style="stroke:var(--teal);fill:#EBF8FF;"/>
+                <text class="graph-node-title" x="40" y="13" text-anchor="middle" font-size="8">prometheus</text>
+                <text class="graph-node-ns"   x="40" y="23" text-anchor="middle" style="fill:var(--teal)" font-size="6">monitoring</text>
+              </g>
+
+              <!-- Node 1: motor-sim-2 (Critical) -->
+              <g class="graph-node-group" transform="translate(10,10)">
+                <rect class="graph-node-rect node-critical" width="140" height="36" rx="4"/>
+                <text class="graph-node-title" x="70" y="16" text-anchor="middle" font-size="9.5">motor-sim-2</text>
+                <text class="graph-node-ns"   x="70" y="27" text-anchor="middle" style="fill:var(--warning)" font-size="7">sensor-sim</text>
+              </g>
+
+              <!-- Node 2: opc-ua-connector (Warning) -->
+              <g class="graph-node-group" transform="translate(10,70)">
+                <rect class="graph-node-rect node-warning" width="140" height="36" rx="4"/>
+                <text class="graph-node-title" x="70" y="16" text-anchor="middle" font-size="9.5">opc-ua-connector</text>
+                <text class="graph-node-ns"   x="70" y="27" text-anchor="middle" style="fill:var(--blue)" font-size="7">abb-edgenius</text>
+              </g>
+
+              <!-- Node 3: data-historian (Warning) -->
+              <g class="graph-node-group" transform="translate(10,130)">
+                <rect class="graph-node-rect node-warning" width="140" height="36" rx="4"/>
+                <text class="graph-node-title" x="70" y="16" text-anchor="middle" font-size="9.5">data-historian</text>
+                <text class="graph-node-ns"   x="70" y="27" text-anchor="middle" style="fill:var(--critical)" font-size="7">abb-genix</text>
+              </g>
+
+              <!-- Node 4: feature-extractor (Normal) -->
+              <g class="graph-node-group" transform="translate(10,190)">
+                <rect class="graph-node-rect" width="140" height="36" rx="4"/>
+                <text class="graph-node-title" x="70" y="16" text-anchor="middle" font-size="9.5">feature-extractor</text>
+                <text class="graph-node-ns"   x="70" y="27" text-anchor="middle" style="fill:var(--critical)" font-size="7">abb-genix</text>
+              </g>
+
+              <!-- Node 5: anomaly-scorer (Critical) -->
+              <g class="graph-node-group" transform="translate(10,250)">
+                <rect class="graph-node-rect node-critical" width="140" height="36" rx="4"/>
+                <text class="graph-node-title" x="70" y="16" text-anchor="middle" font-size="9.5">anomaly-scorer</text>
+                <text class="graph-node-ns"   x="70" y="27" text-anchor="middle" style="fill:var(--critical)" font-size="7">abb-genix</text>
+              </g>
+
+              <!-- Node 6: alert-manager (Normal) -->
+              <g class="graph-node-group" transform="translate(10,310)">
+                <rect class="graph-node-rect" width="140" height="36" rx="4"/>
+                <text class="graph-node-title" x="70" y="16" text-anchor="middle" font-size="9.5">alert-manager</text>
+                <text class="graph-node-ns"   x="70" y="27" text-anchor="middle" style="fill:var(--teal)" font-size="7">monitoring</text>
+              </g>
+
+              <!-- Node 7: cloud-sync (Normal) -->
+              <g class="graph-node-group" transform="translate(10,370)">
+                <rect class="graph-node-rect" width="140" height="36" rx="4"/>
+                <text class="graph-node-title" x="70" y="16" text-anchor="middle" font-size="9.5">cloud-sync</text>
+                <text class="graph-node-ns"   x="70" y="27" text-anchor="middle" style="fill:var(--blue)" font-size="7">abb-edgenius</text>
+              </g>
+
+            </svg>
+          </div>
+          <div class="graph-legend">
+            <div class="legend-item"><span class="status-dot healthy"></span> Healthy</div>
+            <div class="legend-item"><span class="status-dot warning"></span> Degraded</div>
+            <div class="legend-item"><span class="status-dot critical"></span> Critical</div>
+          </div>
+        </div><!-- /graph-panel -->
+
+        <!-- PANEL 4: Metric Streams -->
+        <div class="panel charts-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              Metric Streams (5m window)
+            </div>
+          </div>
+          <div class="charts-container">
+            <div class="mini-chart-card">
+              <div class="mini-chart-header">
+                <span class="mini-chart-title">CPU · anomaly-scorer</span>
+                <span id="cpu-val" class="mini-chart-value">87.3%</span>
+              </div>
+              <div class="mini-chart-body">
+                <svg id="chart-cpu-svg" class="mini-chart-svg"></svg>
+              </div>
+            </div>
+            <div class="mini-chart-card">
+              <div class="mini-chart-header">
+                <span class="mini-chart-title">Memory · model-server</span>
+                <span id="mem-val" class="mini-chart-value">89.2%</span>
+              </div>
+              <div class="mini-chart-body">
+                <svg id="chart-mem-svg" class="mini-chart-svg"></svg>
+              </div>
+            </div>
+            <div class="mini-chart-card">
+              <div class="mini-chart-header">
+                <span class="mini-chart-title">PVC Fill · data-historian</span>
+                <span id="pvc-val" class="mini-chart-value">78.1%</span>
+              </div>
+              <div class="mini-chart-body">
+                <svg id="chart-pvc-svg" class="mini-chart-svg"></svg>
+              </div>
+            </div>
+            <div class="mini-chart-card">
+              <div class="mini-chart-header">
+                <span class="mini-chart-title">Network I/O · motor-sim-2</span>
+                <span id="net-val" class="mini-chart-value">3.2 MB/s</span>
+              </div>
+              <div class="mini-chart-body">
+                <svg id="chart-net-svg" class="mini-chart-svg"></svg>
+              </div>
+            </div>
+          </div>
+        </div><!-- /charts-panel -->
+
+      </div><!-- /middle-row -->
+
+      <!-- ── BOTTOM ROW ──────────────────────────────────────────── -->
+      <div class="bottom-row">
+
+        <!-- PANEL 5: Anomaly Correlation Timeline -->
+        <div class="panel timeline-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Anomaly Correlation Timeline
+            </div>
+            <span class="badge badge-critical">HIGH SEVERITY</span>
+          </div>
+          <div class="timeline-container">
+            <div class="timeline-chain-label">CORRELATED CHAIN · Motor-2 Cascade · Detected in 22 seconds</div>
+            <div class="timeline-wrapper">
+
+              <div class="timeline-event">
+                <div class="timeline-dot"></div>
+                <div class="event-row">
+                  <span class="event-time">T+00:00</span>
+                  <span class="event-agent-pill agent-net">NETWORK</span>
+                  <span class="event-pod">motor-sim-2</span>
+                </div>
+                <div class="event-desc">
+                  Egress flood detected · <span class="event-metric">3.2 MB/s</span> above baseline
+                </div>
+              </div>
+
+              <div class="timeline-event">
+                <div class="timeline-dot"></div>
+                <div class="event-row">
+                  <span class="event-time">T+00:08</span>
+                  <span class="event-agent-pill agent-cpu">CPU</span>
+                  <span class="event-pod">opc-ua-connector</span>
+                </div>
+                <div class="event-desc">
+                  CPU burst to <span class="event-metric">72%</span> · Root cause: upstream sensor flood
+                </div>
+              </div>
+
+              <div class="timeline-event">
+                <div class="timeline-dot"></div>
+                <div class="event-row">
+                  <span class="event-time">T+00:15</span>
+                  <span class="event-agent-pill agent-disk">DISK</span>
+                  <span class="event-pod">data-historian</span>
+                </div>
+                <div class="event-desc">
+                  PVC write surge · Volume at <span class="event-metric">78%</span> full
+                </div>
+              </div>
+
+              <div class="timeline-event">
+                <div class="timeline-dot"></div>
+                <div class="event-row">
+                  <span class="event-time">T+00:22</span>
+                  <span class="event-agent-pill agent-cpu">CPU</span>
+                  <span class="event-pod">anomaly-scorer</span>
+                </div>
+                <div class="event-desc">
+                  CPU spike to <span class="event-metric">87.3%</span> · Inference latency increasing
+                </div>
+              </div>
+
+              <div class="timeline-event">
+                <div class="timeline-dot warn"></div>
+                <div class="event-row">
+                  <span class="event-time" style="color:var(--warning);background:rgba(217,119,6,.08);">T+00:30</span>
+                  <span class="event-agent-pill agent-storage">STORAGE</span>
+                  <span class="event-pod">data-historian</span>
+                </div>
+                <div class="event-desc">
+                  Time-to-full forecast: <span style="font-family:var(--font-mono);font-weight:700;color:var(--warning);">5h 42m</span> · <strong style="color:var(--warning);">WARNING</strong>
+                </div>
+              </div>
+
+            </div><!-- /timeline-wrapper -->
+          </div><!-- /timeline-container -->
+        </div>
+
+        <!-- PANEL 6: NLP Insight -->
+        <div class="panel insight-panel">
+          <div class="panel-header" style="border-left:3px solid var(--purple);">
+            <div class="panel-title" style="color:var(--purple);">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              EdgeMind Orchestrator · AI Insight
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <span class="pulsing-dot red" style="width:6px;height:6px;"></span>
+              <span style="font-family:var(--font-mono);font-size:9px;font-weight:700;color:var(--critical);">LIVE</span>
+            </div>
+          </div>
+          <div class="insight-content">
+
+            <div class="insight-card">
+              <div class="insight-heading">Active Alert — Motor-2 Anomaly Cascade</div>
+              <p class="insight-body">
+                Motor Simulator 2 in the <strong>sensor-sim</strong> namespace is emitting an abnormal vibration data burst, triggering a downstream resource cascade through the CM/PdM pipeline. The OPC-UA connector is absorbing elevated ingress traffic, accelerating the data historian's PVC fill rate to <strong>78% capacity</strong> — projected to reach critical saturation in approximately <strong>5 hours 42 minutes</strong>. The anomaly-scorer pod in abb-genix is experiencing CPU throttling as a direct result, causing inference latency spikes. Motor fault alerts may be delayed by up to <strong>45 seconds</strong> during this window.
+              </p>
+              <div class="insight-actions-title">Recommended Actions</div>
+              <ol class="insight-actions-list">
+                <li>
+                  <span class="li-num">1</span>
+                  <span>Verify <strong>motor-sim-2</strong> bearing condition — abnormal vibration signature detected across 0–20 kHz FFT range</span>
+                </li>
+                <li>
+                  <span class="li-num">2</span>
+                  <span>Expand <strong>data-historian</strong> PVC allocation immediately — less than 6 hours before pipeline halt</span>
+                </li>
+                <li>
+                  <span class="li-num">3</span>
+                  <span>Throttle <strong>cloud-sync</strong> pod to free CPU headroom for anomaly-scorer inference</span>
+                </li>
+              </ol>
+              <div class="insight-footer">
+                Generated 3s ago · claude-sonnet-4 · 1 correlated chain · 4 agents active
+              </div>
+            </div>
+
+            <div class="collapsed-alerts-container">
+              <div class="collapsed-alert-row">
+                <span>12m ago · Cloud-sync resource conflict</span>
+                <span class="resolved-tag">RESOLVED</span>
+              </div>
+              <div class="collapsed-alert-row">
+                <span>47m ago · Model cold-start memory spike</span>
+                <span class="resolved-tag">RESOLVED</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- /bottom-row -->
+
+      <!-- ── PANEL 7: Agent Status Bar ───────────────────────────── -->
+      <div class="agent-status-bar">
+
+        <div class="agent-status-card" style="border-left:2px solid var(--healthy);">
+          <div class="agent-card-header">
+            <span class="agent-name">CPU Agent</span>
+            <span class="agent-pill running">RUNNING</span>
+          </div>
+          <div class="agent-card-body">
+            <span class="agent-findings red-text">2 anomalies detected</span>
+            <svg id="agent-spark-cpu" class="agent-sparkline-svg"></svg>
+          </div>
+        </div>
+
+        <div class="agent-status-card" style="border-left:2px solid var(--healthy);">
+          <div class="agent-card-header">
+            <span class="agent-name">Memory Agent</span>
+            <span class="agent-pill running">RUNNING</span>
+          </div>
+          <div class="agent-card-body">
+            <span class="agent-findings amber-text">1 warning active</span>
+            <svg id="agent-spark-memory" class="agent-sparkline-svg"></svg>
+          </div>
+        </div>
+
+        <div class="agent-status-card" style="border-left:2px solid var(--warning);">
+          <div class="agent-card-header">
+            <span class="agent-name">Storage Agent</span>
+            <span class="agent-pill running">RUNNING</span>
+          </div>
+          <div class="agent-card-body">
+            <span class="agent-findings red-text">1 critical forecast</span>
+            <svg id="agent-spark-storage" class="agent-sparkline-svg"></svg>
+          </div>
+        </div>
+
+        <div class="agent-status-card" style="border-left:2px solid var(--critical);">
+          <div class="agent-card-header">
+            <span class="agent-name">Network Agent</span>
+            <span class="agent-pill alert">ALERT ACTIVE</span>
+          </div>
+          <div class="agent-card-body">
+            <span class="agent-findings red-text" style="font-weight:700;">1 flood detected</span>
+            <svg id="agent-spark-network" class="agent-sparkline-svg"></svg>
+          </div>
+        </div>
+
+        <div class="agent-status-card" style="border-left:2px solid var(--purple);">
+          <div class="agent-card-header">
+            <span class="agent-name">Orchestrator</span>
+            <span class="agent-pill correlating">CORRELATING</span>
+          </div>
+          <div class="agent-card-body">
+            <span class="agent-findings purple-text">1 chain · 5 events</span>
+            <svg id="agent-spark-orchestrator" class="agent-sparkline-svg"></svg>
+          </div>
+        </div>
+
+      </div><!-- /agent-status-bar -->
+
+    </div><!-- /dashboard-content -->
+
+    <!-- ── COPILOT CHATBOT DRAWER ──────────────────────────────── -->
+    <div id="copilot-chat-container">
+      <!-- Chat Bubble (Closed State) -->
+      <button id="copilot-trigger" aria-label="Toggle Copilot Chat">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span class="pulse-ring"></span>
+      </button>
+
+      <!-- Chat Window (Open State) -->
+      <div id="copilot-window" class="hidden">
+        <div class="chat-header">
+          <div class="chat-header-title">
+            <span class="purple-pulse"></span>
+            <strong>EDGEMIND COPILOT</strong>
+          </div>
+          <button id="chat-close" aria-label="Close Chat">×</button>
+        </div>
+        <div class="chat-messages" id="chat-messages-box">
+          <div class="message incoming">
+            <strong>Orchestrator Agent</strong>
+            <div class="msg-bubble">
+              Hello Operator. I have detected an anomaly cascade starting at <code>motor-sim-2</code>. I'm correlating telemetry from all specialist agents. How can I assist you?
+            </div>
+          </div>
+          <!-- Quick Chips -->
+          <div class="chat-chips-container">
+            <button class="chat-chip" data-query="Show root cause">Show root cause</button>
+            <button class="chat-chip" data-query="What are the recommended actions?">Recommended actions</button>
+            <button class="chat-chip" data-query="Check CPU of anomaly-scorer">Check CPU status</button>
+            <button class="chat-chip" data-query="Run diagnostics">Run diagnostics</button>
+          </div>
+        </div>
+        <form class="chat-input-area" id="chat-form">
+          <input type="text" id="chat-input" placeholder="Type your query here..." autocomplete="off" />
+          <button type="submit" id="chat-send" aria-label="Send Message">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div><!-- /dashboard-frame -->
+
+  <script src="index.js"></script>
+</body>
+</html>
