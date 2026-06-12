@@ -415,6 +415,63 @@ async def test_emit_loop_updates_nodes(server_fixture):
     assert value > 0.0, "emit_loop never wrote VibrationAxial (still 0.0)"
 
 
+@pytest.mark.asyncio
+async def test_emit_loop_flood_ticks_faster_than_normal(server_fixture):
+    """
+    The emit_loop must change CADENCE based on fault_state.flood:
+      • normal → 1 Hz   (NORMAL_PERIOD_S = 1.0 s)
+      • flood  → 10 Hz  (FLOOD_PERIOD_S  = 0.1 s)
+
+    Count update_nodes() calls over a 1.0 s window in each mode by wrapping the
+    bound method with a counter. Flood must produce many more ticks than normal.
+    """
+    server, fault_state = server_fixture
+    original_update = server.update_nodes
+
+    counter = {"n": 0}
+
+    async def counting_update(reading):
+        counter["n"] += 1
+        await original_update(reading)
+
+    # ── Normal cadence: ~1 tick in 1.0 s (expect 1–2) ──────────────────────────
+    fault_state.clear()
+    counter["n"] = 0
+    server.update_nodes = counting_update
+    try:
+        task = asyncio.create_task(server.emit_loop(fault_state))
+        await asyncio.sleep(1.05)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        normal_ticks = counter["n"]
+
+        # ── Flood cadence: ~10 ticks in 1.0 s (expect well above normal) ───────
+        fault_state.activate("flood", 0)
+        assert fault_state.flood is True
+        counter["n"] = 0
+        task = asyncio.create_task(server.emit_loop(fault_state))
+        await asyncio.sleep(1.05)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        flood_ticks = counter["n"]
+    finally:
+        server.update_nodes = original_update   # restore for other tests
+        fault_state.clear()
+
+    # Normal should be ~1–2 ticks; flood ~10. Robust bounds for timing jitter.
+    assert normal_ticks <= 3, f"normal mode ticked {normal_ticks} times in 1 s (expected ~1)"
+    assert flood_ticks >= 5, f"flood mode ticked only {flood_ticks} times in 1 s (expected ~10)"
+    assert flood_ticks > normal_ticks * 2, (
+        f"flood ({flood_ticks}) not meaningfully faster than normal ({normal_ticks})"
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 9 — Constructor validation (sync, no server needed)
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,54 @@
+# EdgeMind sensor-sim — three pump simulators from one image.
+#
+#   docker compose up --build        # build once, run all three
+#   docker compose logs -f sensor-sim-2
+#   docker compose down
+#
+# Each service runs the SAME image with a different PUMP_ID and port pair.
+# Host ports mirror container ports so you can curl the inject API directly:
+#   pump1 → OPC 4840 / HTTP 8080
+#   pump2 → OPC 4841 / HTTP 8081   (primary fault-injection target)
+#   pump3 → OPC 4842 / HTTP 8082
+
+services:
+  sensor-sim-1:
+    build: .
+    image: edgemind/sensor-sim:latest      # built once, reused by 2 and 3
+    container_name: sensor-sim-1
+    environment:
+      PUMP_ID: pump1
+      OPC_PORT: "4840"
+      HTTP_PORT: "8080"
+      LOG_LEVEL: INFO
+    ports:
+      - "4840:4840"   # OPC-UA
+      - "8080:8080"   # inject API
+    restart: unless-stopped
+
+  sensor-sim-2:
+    image: edgemind/sensor-sim:latest
+    container_name: sensor-sim-2
+    depends_on: [sensor-sim-1]             # ensure the image is built first
+    environment:
+      PUMP_ID: pump2
+      OPC_PORT: "4841"
+      HTTP_PORT: "8081"
+      LOG_LEVEL: INFO
+    ports:
+      - "4841:4841"
+      - "8081:8081"
+    restart: unless-stopped
+
+  sensor-sim-3:
+    image: edgemind/sensor-sim:latest
+    container_name: sensor-sim-3
+    depends_on: [sensor-sim-1]
+    environment:
+      PUMP_ID: pump3
+      OPC_PORT: "4842"
+      HTTP_PORT: "8082"
+      LOG_LEVEL: INFO
+    ports:
+      - "4842:4842"
+      - "8082:8082"
+    restart: unless-stopped
