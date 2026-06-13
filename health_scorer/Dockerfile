@@ -13,6 +13,7 @@ COPY health_scorer/ health_scorer/
 
 # Run from /app so `from common.contract import ...` and `from scorer import ...`
 # both resolve correctly (common/ and health_scorer/ are siblings under /app).
+ENV PYTHONPATH=/app
 WORKDIR /app/health_scorer
 
 ENV INFLUX_URL=http://data-historian:8086 \
