@@ -45,6 +45,7 @@ brew install k3d kubectl helm
 docker context use orbstack
 docker ps
 ```
+
 **Memory:** If you are on 8 GB RAM, cap OrbStack's memory limit to 4 GB in OrbStack → Settings → Resources before proceeding.
 
 ---
@@ -350,6 +351,33 @@ docker system prune -af --volumes
 ---
 
 ## Troubleshooting
+
+**Prometheus or InfluxDB missing after cluster recreation**
+Helm releases are tied to the cluster. If you delete and recreate the k3d cluster, you must reinstall both:
+```bash
+# Reinstall Prometheus
+helm install monitoring prometheus-community/kube-prometheus-stack \
+  -n monitoring \
+  --set prometheus.prometheusSpec.scrapeInterval=15s \
+  --set grafana.enabled=false \
+  --set prometheus.prometheusSpec.retention=7d
+
+# Reinstall InfluxDB
+helm install data-historian influxdata/influxdb2 \
+  --namespace pump-station \
+  --set adminUser.organization=edgemind \
+  --set adminUser.bucket=pump_station \
+  --set adminUser.token=edgemind-dev-token \
+  --set adminUser.user=admin \
+  --set adminUser.password=edgemind-admin \
+  --set persistence.enabled=true \
+  --set persistence.size=2Gi \
+  --set resources.requests.memory=256Mi \
+  --set resources.requests.cpu=100m \
+  --set resources.limits.memory=512Mi \
+  --set resources.limits.cpu=500m
+```
+Also re-run Steps 6–9 (base manifests, build images, import, deploy) after every cluster recreation.
 
 **Pods stuck in `CreateContainerConfigError`**
 The `influxdb-token` secret is missing. Run:
