@@ -81,6 +81,21 @@ k3d image import \
 log "Creating namespaces..."
 kubectl apply -f k8s/namespaces.yaml
 
+# ── 4b. InfluxDB (data-historian) ────────────────────────────────────────────
+log "Installing InfluxDB (data-historian)..."
+helm repo add influxdata https://helm.influxdata.com/ 2>/dev/null || true
+helm repo update
+
+helm upgrade --install data-historian influxdata/influxdb2 \
+    --namespace pump-station \
+    --set adminUser.organization=edgemind \
+    --set adminUser.bucket=pump_station \
+    --set adminUser.token=edgemind-dev-token \
+    --set persistence.size=2Gi \
+    --set resources.limits.memory=512Mi \
+    --set resources.limits.cpu=500m \
+    --wait --timeout=120s
+
 # ── 5. Pump-station ───────────────────────────────────────────────────────────
 log "Deploying pump-station services..."
 kubectl apply -f k8s/pump-station/00-pvc.yaml

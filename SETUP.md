@@ -222,7 +222,7 @@ PUMP2_POD=$(kubectl get pod -n pump-station -l app=sensor-sim-2 -o jsonpath='{.i
 
 # Bearing fault — axial vibration rises 0.8 → 4.8 mm/s over 5 min
 kubectl exec -n pump-station $PUMP2_POD -- \
-  curl -s -X POST http://localhost:8081/inject \
+  curl -s -X POST http://localhost:8080/inject \
   -H 'Content-Type: application/json' \
   -d '{"mode":"bearing_fault","duration_s":300}'
 
