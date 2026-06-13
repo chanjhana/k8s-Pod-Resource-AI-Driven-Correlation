@@ -140,7 +140,9 @@ async def manage_pump(pump_id: str, url: str, buffer: TelemetryBuffer) -> None:
                 # Keepalive: detect a dropped connection and trigger reconnect.
                 while True:
                     await asyncio.sleep(5)
-                    await client.check_connection()
+                    # Lightweight read to verify connection is alive.
+                    # check_connection() does not exist in asyncua 2.x.
+                    await client.nodes.root.read_browse_name()
         except Exception as exc:  # noqa: BLE001
             log.warning("pump=%s connection issue: %s — retrying in 3s", pump_id, exc)
             await asyncio.sleep(3)
