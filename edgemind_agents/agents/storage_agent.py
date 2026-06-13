@@ -45,7 +45,7 @@ class StorageAgent(BaseAgent):
         self._pvc_windows: Dict[str, deque] = defaultdict(lambda: deque(maxlen=STORAGE_PVC_ROLL_WINDOW))
         # pvc_name -> set of container names that mount it
         self._pvc_pod_map: Dict[str, Set[str]] = {}
-        self._last_pvc_refresh: float = 0.0
+        self._last_pvc_refresh: float = -999.0  # force refresh on first process() call
 
     async def _refresh_pvc_map(self) -> None:
         now = time.monotonic()
