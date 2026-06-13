@@ -76,22 +76,30 @@ class MemoryAgent(BaseAgent):
                 await self.publish_finding({
                     "anomaly_type": NODE_PRESSURE,
                     "severity": SEV_CRITICAL,
+                    "pod": "k8s-node",
+                    "namespace": "kube-system",
                     "mem_available_bytes": node.mem_available_bytes,
                     "mem_total_bytes": node.mem_total_bytes,
                     "mem_pressure_ratio": round(pressure, 3),
                     "likely_cause_pod": worst_pod.pod if worst_pod else None,
                     "likely_cause_slope_mb_per_min": round(worst_slope, 2) if worst_pod else None,
                     "current_value": node.mem_available_bytes / _GB,
+                    "baseline_value": round(MEM_NODE_WARN_RATIO, 2),
+                    "deviation": f"available ratio {pressure:.1%} vs threshold {MEM_NODE_WARN_RATIO:.0%}",
                     "evidence": evidence,
                 })
             elif pressure < MEM_NODE_WARN_RATIO:
                 await self.publish_finding({
                     "anomaly_type": NODE_PRESSURE,
                     "severity": SEV_WARNING,
+                    "pod": "k8s-node",
+                    "namespace": "kube-system",
                     "mem_available_bytes": node.mem_available_bytes,
                     "mem_total_bytes": node.mem_total_bytes,
                     "mem_pressure_ratio": round(pressure, 3),
                     "current_value": node.mem_available_bytes / _GB,
+                    "baseline_value": round(MEM_NODE_WARN_RATIO, 2),
+                    "deviation": f"available ratio {pressure:.1%} vs threshold {MEM_NODE_WARN_RATIO:.0%}",
                     "evidence": [
                         f"Node available memory {node.mem_available_bytes / _GB:.2f} GB of {node.mem_total_bytes / _GB:.1f} GB total",
                         f"Available ratio {pressure:.1%} — below {MEM_NODE_WARN_RATIO:.0%} warning threshold",
@@ -118,6 +126,8 @@ class MemoryAgent(BaseAgent):
                             "mem_limit_bytes": pod.mem_limit_bytes,
                             "restart_count": pod.restart_count,
                             "current_value": pod.mem_rss_bytes / _MB,
+                            "baseline_value": round(MEM_OOM_WS_RATIO, 2),
+                            "deviation": f"pre-restart working set was {(pre_ws / pod.mem_limit_bytes):.1%} of limit",
                             "evidence": [
                                 f"Pod restarted — restart count now {pod.restart_count}",
                                 f"Pre-restart working set was {(pre_ws / pod.mem_limit_bytes):.1%} of limit",
@@ -141,6 +151,8 @@ class MemoryAgent(BaseAgent):
                         "delta_mb": round(delta_mb, 1),
                         "rss_mb": round(pod.mem_rss_bytes / _MB, 1),
                         "current_value": delta_mb,
+                        "baseline_value": round(MEM_STEP_CHANGE_MB, 0),
+                        "deviation": f"RSS jumped {delta_mb:.0f} MB vs step-change threshold {MEM_STEP_CHANGE_MB:.0f} MB",
                         "evidence": [
                             f"RSS jumped {delta_mb:.0f} MB in one scrape interval ({COLLECT_INTERVAL_S}s)",
                             "Likely cause: cold start, model load, or cache warming",
@@ -173,6 +185,8 @@ class MemoryAgent(BaseAgent):
                     "r_squared": round(r_squared, 3),
                     "current_rss_mb": round(pod.mem_rss_bytes / _MB, 1),
                     "current_value": pod.mem_rss_bytes / _MB,
+                    "baseline_value": round(MEM_LEAK_SLOPE_MB_PER_MIN, 1),
+                    "deviation": f"slope {slope_mb_per_min:.1f} MB/min vs threshold {MEM_LEAK_SLOPE_MB_PER_MIN} MB/min",
                     "evidence": [
                         f"RSS slope {slope_mb_per_min:.1f} MB/min (threshold {MEM_LEAK_SLOPE_MB_PER_MIN} MB/min)",
                         f"R² = {r_squared:.3f} — {'strong' if r_squared > 0.85 else 'moderate'} linear fit confirming monotonic growth",
@@ -209,6 +223,8 @@ class MemoryAgent(BaseAgent):
                         "mem_limit_bytes": pod.mem_limit_bytes,
                         "mem_working_set_bytes": pod.mem_working_set_bytes,
                         "current_value": pod.mem_rss_bytes / _MB,
+                        "baseline_value": round(MEM_PRE_OOM_RATIO, 2),
+                        "deviation": f"working set at {ws_ratio:.1%} of limit",
                         "evidence": [
                             f"Working set at {ws_ratio:.1%} of memory limit ({pod.mem_working_set_bytes / _MB:.0f} MB / {pod.mem_limit_bytes / _MB:.0f} MB)",
                             f"OOM projected in {eta_min:.1f} minutes at current growth rate",

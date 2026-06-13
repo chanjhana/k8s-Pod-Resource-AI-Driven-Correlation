@@ -29,6 +29,14 @@ class BaseAgent(ABC):
         finding["finding_id"] = str(uuid.uuid4())
         finding["timestamp"] = datetime.now(timezone.utc).isoformat()
         finding["agent"] = self.name
+        # Ensure all schema fields present with defaults
+        finding.setdefault("pod", None)
+        finding.setdefault("namespace", None)
+        finding.setdefault("baseline_value", None)
+        finding.setdefault("deviation", None)
+        finding.setdefault("affected_pods", [])
+        finding.setdefault("pvc_name", None)
+        finding.setdefault("eta_minutes", None)
         payload = json.dumps(finding)
         pipe = self.redis.pipeline()
         pipe.lpush(REDIS_FINDINGS_KEY, payload)

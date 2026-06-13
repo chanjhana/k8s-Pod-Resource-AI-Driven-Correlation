@@ -492,3 +492,27 @@ async def test_log_health_scorer_pump_critical(mock_redis):
     pump_findings = [f for f in findings if f["anomaly_type"] == PUMP_HEALTH_CRIT]
     assert len(pump_findings) == 1
     assert pump_findings[0]["pump"] == "pump2"
+
+
+async def test_finding_schema_complete(mock_redis, mock_k8s):
+    """Every finding must have all required schema fields."""
+    REQUIRED_FIELDS = {
+        "finding_id", "agent", "timestamp", "anomaly_type", "severity",
+        "current_value", "evidence", "affected_pods", "pvc_name", "eta_minutes"
+    }
+    # Trigger CPU spike finding
+    agent = CPUAgent("cpu", asyncio.Queue(), mock_redis)
+    await warm_agent(agent, make_snapshot(), n=25)
+    for _ in range(3):
+        snap = make_snapshot()
+        snap.pods["pump-station/opc-ua-collector"].cpu_usage_cores = 0.8
+        await agent.process(snap)
+
+    findings = mock_redis.get_findings()
+    assert len(findings) > 0, "No findings produced"
+    for finding in findings:
+        missing = REQUIRED_FIELDS - set(finding.keys())
+        assert not missing, f"Finding missing required fields: {missing}\nFinding: {finding}"
+        assert isinstance(finding["evidence"], list), "evidence must be a list"
+        assert len(finding["evidence"]) > 0, "evidence must have at least 1 item"
+        assert isinstance(finding["affected_pods"], list), "affected_pods must be a list"

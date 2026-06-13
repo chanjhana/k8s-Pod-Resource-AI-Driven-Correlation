@@ -122,6 +122,8 @@ class CPUAgent(BaseAgent):
                 "cpu_limit_cores": pod.cpu_limit_cores,
                 "z_score": round(z, 2),
                 "node_cpu_idle_ratio": round(node.cpu_idle_ratio, 3) if node else None,
+                "baseline_value": round(mean, 4),
+                "deviation": f"{z:.1f}σ above {CPU_ROLLING_WINDOW}-cycle baseline",
                 "current_value": pod.cpu_usage_cores,
                 "evidence": evidence,
             })
@@ -144,6 +146,8 @@ class CPUAgent(BaseAgent):
                 "cpu_usage_cores": pod.cpu_usage_cores,
                 "cpu_limit_cores": pod.cpu_limit_cores,
                 "detail": detail,
+                "baseline_value": round(CPU_THROTTLE_RATIO, 2),
+                "deviation": f"throttle ratio {pod.cpu_throttle_rate:.1%} vs threshold {CPU_THROTTLE_RATIO:.0%}",
                 "current_value": pod.cpu_usage_cores,
                 "evidence": [
                     f"Throttle rate {pod.cpu_throttle_rate:.1%} exceeds {CPU_THROTTLE_RATIO:.0%} threshold",

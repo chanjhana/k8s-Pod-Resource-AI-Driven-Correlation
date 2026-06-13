@@ -113,11 +113,16 @@ DEP_CONFIRM_LAG_S = 30
 # Namespace filter
 WATCHED_NAMESPACES = "pump-station|monitoring"
 
+# Kubernetes event type strings (used as anomaly_type values in findings)
+K8S_EVICTION = "eviction"
+K8S_FAILED_MOUNT = "volume_mount_failure"
+K8S_NODE_NOT_READY = "node_pressure"
+
 # Kubernetes critical event reasons
 CRITICAL_K8S_EVENTS = {
-    "OOMKilling": K8S_OOMKILL,
-    "BackOff": CRASH_LOOP,
-    "Evicted": "eviction",
-    "FailedMount": "volume_mount_failure",
-    "NodeNotReady": "node_pressure",
+    "OOMKilling":  K8S_OOMKILL,
+    "BackOff":     CRASH_LOOP,
+    "Evicted":     K8S_EVICTION,
+    "FailedMount": K8S_FAILED_MOUNT,
+    "NodeNotReady": K8S_NODE_NOT_READY,
 }

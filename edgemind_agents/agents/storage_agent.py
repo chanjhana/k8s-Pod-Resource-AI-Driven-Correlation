@@ -89,6 +89,8 @@ class StorageAgent(BaseAgent):
                         "pre_restart_io_sat": round(state.last_io_sat, 3),
                         "restart_count": pod.restart_count,
                         "current_value": state.last_io_sat,
+                        "baseline_value": round(STORAGE_IO_SAT_WARNING, 2),
+                        "deviation": f"pre-restart I/O saturation {state.last_io_sat:.1%}",
                         "evidence": [
                             f"Pod restarted after I/O saturation of {state.last_io_sat:.1%}",
                             "High disk I/O likely contributed to instability",
@@ -122,6 +124,8 @@ class StorageAgent(BaseAgent):
                     "container": pod.container,
                     "io_saturation": round(pod.fs_io_saturation, 3),
                     "current_value": pod.fs_io_saturation,
+                    "baseline_value": round(STORAGE_IO_SAT_WARNING, 2),
+                    "deviation": f"saturation {pod.fs_io_saturation:.1%} vs threshold {STORAGE_IO_SAT_WARNING:.0%}",
                     "evidence": io_evidence,
                 })
             elif pod.fs_io_saturation >= STORAGE_IO_SAT_WARNING:
@@ -134,6 +138,8 @@ class StorageAgent(BaseAgent):
                     "container": pod.container,
                     "io_saturation": round(pod.fs_io_saturation, 3),
                     "current_value": pod.fs_io_saturation,
+                    "baseline_value": round(STORAGE_IO_SAT_WARNING, 2),
+                    "deviation": f"saturation {pod.fs_io_saturation:.1%} vs threshold {STORAGE_IO_SAT_WARNING:.0%}",
                     "evidence": io_evidence,
                 })
 
@@ -158,6 +164,8 @@ class StorageAgent(BaseAgent):
                     "write_bytes_per_sec": pod.fs_write_bytes_per_sec,
                     "z_score": round(z, 2),
                     "current_value": pod.fs_write_bytes_per_sec / _MB,
+                    "baseline_value": round(mean / _MB, 3),
+                    "deviation": f"Z-score {z:.1f} vs threshold {STORAGE_WRITE_BURST_Z}",
                     "evidence": [
                         f"Write rate {pod.fs_write_bytes_per_sec / _MB:.1f} MB/s — Z-score {z:.1f} above {STORAGE_ROLL_WINDOW}-cycle baseline",
                         f"Sustained for {state.sustained_burst_cycles} consecutive cycles",
@@ -174,9 +182,14 @@ class StorageAgent(BaseAgent):
                     await self.publish_finding({
                         "anomaly_type": PVC_CONTENTION,
                         "severity": SEV_WARNING,
+                        "pod": "pvc",
+                        "namespace": list(shared)[0].split("/")[0] if shared else "",
                         "pvc": pvc_name,
+                        "pvc_name": pvc_name,
                         "contending_pods": list(shared),
                         "current_value": len(shared),
+                        "baseline_value": 1,
+                        "deviation": f"{len(shared)} pods with simultaneous I/O saturation on same PVC",
                         "evidence": [
                             f"{len(shared)} pods showing elevated I/O simultaneously on PVC {pvc_name}",
                             f"Contending pods: {', '.join(shared)}",
@@ -214,13 +227,18 @@ class StorageAgent(BaseAgent):
                 await self.publish_finding({
                     "anomaly_type": PVC_FILL,
                     "severity": severity,
-                    "pvc": pvc_name,
+                    "pod": "pvc",
                     "namespace": pvc.namespace,
+                    "pvc": pvc_name,
+                    "pvc_name": pvc_name,
                     "fill_ratio": round(pvc.fill_ratio, 3),
                     "used_bytes": pvc.used_bytes,
                     "capacity_bytes": pvc.capacity_bytes,
                     "ttf_hours": round(ttf_hours, 1) if ttf_hours is not None else None,
                     "current_value": pvc.fill_ratio,
+                    "baseline_value": round(STORAGE_PVC_FILL_WARN, 2),
+                    "deviation": f"fill ratio {pvc.fill_ratio:.1%} vs warning threshold {STORAGE_PVC_FILL_WARN:.0%}",
+                    "eta_minutes": round(ttf_hours * 60, 0) if ttf_hours is not None else None,
                     "evidence": [
                         f"PVC {pvc_name} at {pvc.fill_ratio:.1%} capacity ({pvc.used_bytes / _MB:.0f} MB / {pvc.capacity_bytes / _MB:.0f} MB)",
                         f"TTF: {ttf_hours:.1f} hours at current fill rate" if ttf_hours is not None else "Fill rate insufficient for TTF forecast",
