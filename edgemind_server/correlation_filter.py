@@ -41,6 +41,16 @@ CRITICAL_ANOMALY_TYPES_IMMEDIATE = {
 # Only findings from these namespaces are considered
 MONITORED_NAMESPACES = {"pump-station"}
 
+SINGLE_AGENT_SUFFICIENT = {
+    "pump_health_critical",
+    "oom_kill",
+    "cpu_spike",
+    "memory_leak", 
+    "pvc_fill",
+    "network_flood",
+    "io_saturation",
+}
+
 
 @dataclass
 class CorrelatedSignalBundle:
@@ -79,7 +89,7 @@ class CorrelationFilter:
         self._window: List[Dict[str, Any]] = []
         self._window_start: Optional[float] = None
         self._seen_keys: set = set()  # dedup within window
-        self._last_trigger_time: float = 0.0
+        self._last_trigger_time: float = -999.0
 
     def _add_to_window(self, finding: Dict[str, Any]) -> None:
         """Add finding to current window, deduplicating by (anomaly_type, pod)."""
@@ -97,22 +107,22 @@ class CorrelationFilter:
             self._window_start = time.monotonic()
 
     def _should_trigger(self) -> Optional[str]:
-        """Return trigger reason string or None."""
         if not self._window:
             return None
 
-        # Cooldown: suppress if orchestrator was called recently
-        if (time.monotonic() - self._last_trigger_time) < ORCHESTRATOR_COOLDOWN_S:
-            log.debug("Cooldown active, skipping trigger")
+        now = time.monotonic()
+        if (now - self._last_trigger_time) < ORCHESTRATOR_COOLDOWN_S:
             return None
 
-        # Single CRITICAL of a high-signal type → immediate trigger
         for f in self._window:
-            if (f.get("severity") == "critical" and
-                    f.get("anomaly_type") in CRITICAL_ANOMALY_TYPES_IMMEDIATE):
+            if f.get("severity") == "critical" and \
+                    f.get("anomaly_type") in CRITICAL_ANOMALY_TYPES_IMMEDIATE:
                 return "single_critical"
 
-        # 2+ different agents within window → trigger
+        for f in self._window:
+            if f.get("anomaly_type") in SINGLE_AGENT_SUFFICIENT:
+                return "single_agent_significant"
+
         agents = {f.get("agent") for f in self._window if f.get("agent")}
         if len(agents) >= MIN_AGENTS_FOR_TRIGGER:
             return "multi_agent"
