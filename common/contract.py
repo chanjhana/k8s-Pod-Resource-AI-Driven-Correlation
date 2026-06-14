@@ -103,6 +103,12 @@ def axial_baseline(pump_id: str) -> float:
     return PUMP_BASELINES[pump_id][PARAM_AXIAL]
 
 
+def vib_rms_baseline(pump_id: str) -> float:
+    """Overall vibration RMS baseline for a pump (radial²+tangential²+axial²)^0.5."""
+    b = PUMP_BASELINES[pump_id]
+    return (b[PARAM_RADIAL] ** 2 + b[PARAM_TANGENTIAL] ** 2 + b[PARAM_AXIAL] ** 2) ** 0.5
+
+
 # ---------------------------------------------------------------------------
 # InfluxDB schema — bucket, measurements, tag, and field names.
 # Every pipeline component reads/writes through these constants.

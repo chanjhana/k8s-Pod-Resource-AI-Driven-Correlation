@@ -12,7 +12,7 @@ from kubernetes import client as k8s_client, watch as k8s_watch
 
 from edgemind_agents.anomaly_types import (
     NETWORK_FLOOD, PACKET_DROP, DEPENDENCY_CONFIRM,
-    K8S_OOMKILL, CRASH_LOOP,
+    K8S_OOMKILL, CRASH_LOOP, K8S_FAILED_MOUNT,
     LOG_ERROR_SURGE, TIMEOUT_PATTERN, PUMP_HEALTH_CRIT,
     SEV_INFO, SEV_WARNING, SEV_CRITICAL,
     NET_FLOOD_MULTIPLIER, NET_FLOOD_CYCLES,
@@ -30,6 +30,44 @@ from edgemind_agents.models import MetricSnapshot
 log = logging.getLogger(__name__)
 
 _MB = 1024 * 1024
+
+# Only surface K8s lifecycle events from namespaces we actually monitor.
+_WATCHED_EVENT_NAMESPACES = {"pump-station", "monitoring"}
+
+# Max age of a K8s event we'll act on. Events are retained in etcd (~1h) and a
+# poll re-reads them every cycle, so without this guard a single pod restart's
+# FailedMount would re-fire for an hour and pollute every correlation bundle.
+_EVENT_MAX_AGE_S = 120.0
+
+# How often to poll the K8s events API. We POLL (one-shot list in a worker
+# thread) rather than stream: a synchronous watch generator blocks the asyncio
+# event loop whenever events are sparse, which starves the metric collector and
+# every other agent. Polling keeps the loop responsive.
+_K8S_EVENT_POLL_INTERVAL_S = 20.0
+
+# Benign transient projected-volume mount races in k3s/k3d (service-account
+# token + root-CA configmap not yet registered at pod start). These self-heal in
+# seconds and are NOT real failures. A genuine PVC mount failure names the actual
+# PVC, so it won't match these substrings and is still surfaced.
+_BENIGN_MOUNT_SUBSTRINGS = ("kube-root-ca.crt", "kube-api-access")
+
+
+def _event_age_s(obj) -> Optional[float]:
+    """Seconds since a K8s event last occurred; None if no timestamp is available."""
+    ts = (
+        getattr(obj, "last_timestamp", None)
+        or getattr(obj, "event_time", None)
+        or getattr(obj, "creation_timestamp", None)
+    )
+    if ts is None:
+        meta = getattr(obj, "metadata", None)
+        ts = getattr(meta, "creation_timestamp", None) if meta else None
+    if ts is None:
+        return None
+    try:
+        return (datetime.now(timezone.utc) - ts).total_seconds()
+    except TypeError:
+        return None
 
 _ERROR_PATTERNS = [
     re.compile(r"ERROR"),
@@ -64,6 +102,9 @@ class NetworkLogAgent(BaseAgent):
         self._k8s = k8s_v1
         self._net_states: Dict[str, _PodNetState] = defaultdict(_PodNetState)
         self._last_log_tail: float = 0.0
+        # event uid -> monotonic time first seen, so a recurring event is
+        # published once within its age window; pruned past _EVENT_MAX_AGE_S.
+        self._seen_event_uids: Dict[str, float] = {}
 
     async def _process_network(self, snapshot: MetricSnapshot) -> None:
         now = time.monotonic()
@@ -271,43 +312,80 @@ class NetworkLogAgent(BaseAgent):
                             ],
                         })
 
+    def _list_events(self) -> list:
+        """One-shot, synchronous events list. Runs in a worker thread (via
+        asyncio.to_thread) so the blocking HTTP call never stalls the loop."""
+        resp = self._k8s.list_event_for_all_namespaces(_request_timeout=10)
+        return list(resp.items)
+
+    def _prune_seen_events(self, now: float) -> None:
+        """Drop dedup entries older than the age window to bound memory."""
+        stale = [k for k, t in self._seen_event_uids.items() if now - t > _EVENT_MAX_AGE_S]
+        for k in stale:
+            del self._seen_event_uids[k]
+
     async def _watch_k8s_events(self) -> None:
-        w = k8s_watch.Watch()
         while True:
             try:
-                for event in w.stream(
-                    self._k8s.list_event_for_all_namespaces,
-                    timeout_seconds=60,
-                ):
-                    obj = event.get("object")
-                    if obj is None:
-                        continue
+                events = await asyncio.to_thread(self._list_events)
+                now = time.monotonic()
+                self._prune_seen_events(now)
+
+                for obj in events:
                     reason = getattr(obj, "reason", "") or ""
                     anomaly_type = CRITICAL_K8S_EVENTS.get(reason)
-                    if anomaly_type:
-                        involved = getattr(obj, "involved_object", None)
-                        pod_name = getattr(involved, "name", "") if involved else ""
-                        ns = getattr(involved, "namespace", "") if involved else ""
-                        await self.publish_finding({
-                            "anomaly_type": anomaly_type,
-                            "severity": SEV_CRITICAL,
-                            "pod": pod_name,
-                            "namespace": ns,
-                            "k8s_reason": reason,
-                            "message": getattr(obj, "message", ""),
-                            "current_value": 1,
-                            "baseline_value": 0,
-                            "deviation": f"Kubernetes lifecycle event: {reason}",
-                            "evidence": [
-                                f"Kubernetes control plane event: reason={reason}",
-                                f"Message: {getattr(obj, 'message', '')}",
-                            ],
-                        })
+                    if not anomaly_type:
+                        continue
+
+                    involved = getattr(obj, "involved_object", None)
+                    pod_name = getattr(involved, "name", "") if involved else ""
+                    ns = getattr(involved, "namespace", "") if involved else ""
+                    message = getattr(obj, "message", "") or ""
+
+                    # Only namespaces we monitor.
+                    if ns and ns not in _WATCHED_EVENT_NAMESPACES:
+                        continue
+
+                    # Skip stale events (the poll re-reads etcd's full retention).
+                    age = _event_age_s(obj)
+                    if age is not None and age > _EVENT_MAX_AGE_S:
+                        continue
+
+                    # Drop benign transient projected-volume mount races (k3s
+                    # startup); real PVC mount failures don't match these.
+                    if anomaly_type == K8S_FAILED_MOUNT and any(
+                        s in message for s in _BENIGN_MOUNT_SUBSTRINGS
+                    ):
+                        continue
+
+                    # Publish each distinct event only once within its window.
+                    meta = getattr(obj, "metadata", None)
+                    uid = getattr(meta, "uid", None) if meta else None
+                    dedup_key = uid or f"{reason}/{ns}/{pod_name}/{message}"
+                    if dedup_key in self._seen_event_uids:
+                        continue
+                    self._seen_event_uids[dedup_key] = now
+
+                    await self.publish_finding({
+                        "anomaly_type": anomaly_type,
+                        "severity": SEV_CRITICAL,
+                        "pod": pod_name,
+                        "namespace": ns,
+                        "k8s_reason": reason,
+                        "message": message,
+                        "current_value": 1,
+                        "baseline_value": 0,
+                        "deviation": f"Kubernetes lifecycle event: {reason}",
+                        "evidence": [
+                            f"Kubernetes control plane event: reason={reason}",
+                            f"Message: {message}",
+                        ],
+                    })
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                log.warning("K8s event watch disconnected: %s. Reconnecting in 5s.", e)
-                await asyncio.sleep(5)
+                log.warning("K8s event poll failed: %s", e)
+            await asyncio.sleep(_K8S_EVENT_POLL_INTERVAL_S)
 
     async def run(self) -> None:
         hb_task = asyncio.create_task(self._heartbeat_loop())
