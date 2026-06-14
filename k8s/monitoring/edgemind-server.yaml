@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edgemind-server
+  namespace: monitoring
+  labels:
+    app: edgemind-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: edgemind-server
+  template:
+    metadata:
+      labels:
+        app: edgemind-server
+    spec:
+      serviceAccountName: edgemind-sa
+      containers:
+        - name: edgemind-server
+          image: edgemind/server:dev
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: REDIS_URL
+              value: "redis://redis-svc.monitoring.svc.cluster.local:6379"
+            - name: PROMETHEUS_URL
+              value: "http://prometheus-operated.monitoring.svc.cluster.local:9090"
+            - name: OLLAMA_URL
+              value: "http://172.18.0.1:11434"
+            - name: OLLAMA_MODEL
+              value: "qwen3:8b"
+            - name: LOG_LEVEL
+              value: "INFO"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 15
+      terminationGracePeriodSeconds: 30
