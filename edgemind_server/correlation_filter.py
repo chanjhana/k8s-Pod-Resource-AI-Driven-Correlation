@@ -26,10 +26,20 @@ log = logging.getLogger(__name__)
 
 CORRELATION_WINDOW_S = 45
 REDIS_BRPOP_TIMEOUT = 1  # seconds — keeps loop responsive to shutdown
+ORCHESTRATOR_COOLDOWN_S = 120  # max 1 orchestrator call per 2 minutes
 
 # Minimum findings to trigger orchestrator
 MIN_AGENTS_FOR_TRIGGER = 2   # 2+ different agents = trigger
-# Single critical from any agent also triggers immediately
+
+# Only these anomaly types bypass multi-agent requirement when critical.
+# Noisy transient types (volume_mount_failure, log_error_surge) require corroboration.
+CRITICAL_ANOMALY_TYPES_IMMEDIATE = {
+    "oom_kill", "cpu_spike", "memory_leak", "pvc_fill",
+    "network_flood", "io_saturation",
+}
+
+# Only findings from these namespaces are considered
+MONITORED_NAMESPACES = {"pump-station"}
 
 
 @dataclass
@@ -69,9 +79,13 @@ class CorrelationFilter:
         self._window: List[Dict[str, Any]] = []
         self._window_start: Optional[float] = None
         self._seen_keys: set = set()  # dedup within window
+        self._last_trigger_time: float = 0.0
 
     def _add_to_window(self, finding: Dict[str, Any]) -> None:
         """Add finding to current window, deduplicating by (anomaly_type, pod)."""
+        if finding.get("namespace") not in MONITORED_NAMESPACES:
+            log.debug("Ignoring finding from non-monitored namespace: %s", finding.get("namespace"))
+            return
         dedup_key = (finding.get("anomaly_type", ""), finding.get("pod", ""))
         if dedup_key in self._seen_keys:
             log.debug("Dedup: skipping duplicate %s on %s", *dedup_key)
@@ -87,9 +101,15 @@ class CorrelationFilter:
         if not self._window:
             return None
 
-        # Single CRITICAL from any agent → immediate trigger
+        # Cooldown: suppress if orchestrator was called recently
+        if (time.monotonic() - self._last_trigger_time) < ORCHESTRATOR_COOLDOWN_S:
+            log.debug("Cooldown active, skipping trigger")
+            return None
+
+        # Single CRITICAL of a high-signal type → immediate trigger
         for f in self._window:
-            if f.get("severity") == "critical":
+            if (f.get("severity") == "critical" and
+                    f.get("anomaly_type") in CRITICAL_ANOMALY_TYPES_IMMEDIATE):
                 return "single_critical"
 
         # 2+ different agents within window → trigger
@@ -126,6 +146,7 @@ class CorrelationFilter:
             "Correlation triggered: reason=%s agents=%s pods=%s findings=%d",
             trigger_reason, agents, pods, len(self._window),
         )
+        self._last_trigger_time = time.monotonic()
         self._reset_window()
         asyncio.create_task(self._on_trigger(bundle))
 
