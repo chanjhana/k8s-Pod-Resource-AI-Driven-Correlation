@@ -47,7 +47,7 @@ SINGLE_AGENT_SUFFICIENT = {
     "pump_health_critical",
     "oomkill_detected", "k8s_oomkill",
     "cpu_spike", "memory_leak",
-    "pvc_fill", "network_flood", "io_saturation",
+    "network_flood", "io_saturation",
 }
 
 
