@@ -89,6 +89,17 @@ INVESTIGATION STEPS:
 5. Reason from the evidence to identify root cause — do not assume a fault type,
    let the data guide your conclusion
 
+CAUSAL CHAIN RULE: Always trace findings back to the origin of the pipeline.
+If a downstream pod (batch-sync, alert-manager, mock-upload) shows anomalies,
+check what triggered it upstream. Use get_pod_logs on the triggering pod and
+continue tracing upstream until you reach the pod that first showed abnormal
+behaviour. The root_cause_pod must be the EARLIEST pod in the causal chain,
+not a downstream effect.
+
+When investigating pump_health_critical or network anomalies on export services,
+always fetch logs from feature-extractor and health-scorer to understand what
+physical sensor data caused the cascade.
+
 ALERT TYPES:
 - "cascade": fault propagated downstream through the pipeline
 - "contention": pods competing for shared resources

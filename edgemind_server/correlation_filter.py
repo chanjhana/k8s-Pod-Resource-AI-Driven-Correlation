@@ -89,6 +89,7 @@ class CorrelationFilter:
         self._window_start: Optional[float] = None
         self._seen_keys: set = set()  # dedup within window
         self._last_trigger_time: float = -999.0
+        self._pending_trigger: Optional[str] = None
 
     def _add_to_window(self, finding: Dict[str, Any]) -> None:
         """Add finding to current window, deduplicating by (anomaly_type, pod)."""
@@ -163,6 +164,7 @@ class CorrelationFilter:
         self._window = []
         self._window_start = None
         self._seen_keys = set()
+        self._pending_trigger = None
 
     def reset_cooldown(self) -> None:
         """Reset cooldown so the next fault triggers immediately. Call when alerts are cleared."""
@@ -190,13 +192,26 @@ class CorrelationFilter:
                     except json.JSONDecodeError as e:
                         log.warning("Bad JSON from Redis: %s", e)
 
-                # Check trigger conditions after every finding or timeout
+                # Check trigger conditions after every finding or timeout.
+                # single_critical and multi_agent flush immediately.
+                # single_agent_significant defers until window expiry so all
+                # correlated findings accumulate before the AI sees the bundle.
                 trigger = self._should_trigger()
-                if trigger:
+                flushed = False
+                if trigger in ("single_critical", "multi_agent"):
                     self._flush_window(trigger)
-                elif self._window_expired():
-                    log.debug("Window expired with no trigger, resetting")
-                    self._reset_window()
+                    flushed = True
+                elif trigger == "single_agent_significant":
+                    if self._pending_trigger is None:
+                        self._pending_trigger = trigger
+                        log.debug("Pending trigger set: waiting for window to expire")
+
+                if not flushed and self._window_expired():
+                    if self._pending_trigger:
+                        self._flush_window(self._pending_trigger)
+                    else:
+                        log.debug("Window expired with no trigger, resetting")
+                        self._reset_window()
 
             except asyncio.CancelledError:
                 raise
