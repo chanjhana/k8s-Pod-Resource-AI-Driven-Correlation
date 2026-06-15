@@ -81,14 +81,17 @@ CONFIDENCE SCORING:
 - < 0.5: Insufficient evidence — flag for manual investigation
 
 INVESTIGATION STEPS:
-1. Read findings — what pods are affected and what anomaly types?
-2. Use query_prometheus to check pods in the causal chain
-3. Use get_pod_logs to confirm error causes
-4. Use get_kubernetes_events if lifecycle issues suspected
+1. Read findings — identify affected pods and anomaly types
+2. Use query_prometheus to check resource metrics on pods in the causal chain
+3. Use get_pod_logs on the affected pod AND its upstream dependencies to gather
+   raw evidence — error messages, metric values, trends, timestamps
+4. Use get_kubernetes_events if lifecycle issues are suspected
+5. Reason from the evidence to identify root cause — do not assume a fault type,
+   let the data guide your conclusion
 
 ALERT TYPES:
-- "cascade": fault propagated downstream (e.g. sensor flood → collector → historian)
-- "contention": two pods competing for same resource
+- "cascade": fault propagated downstream through the pipeline
+- "contention": pods competing for shared resources
 - "lifecycle": OOMKill, crash loop, eviction
 
 You MUST end your response with a JSON block in this exact format:
@@ -98,8 +101,8 @@ You MUST end your response with a JSON block in this exact format:
   "causal_chain": ["<pod1>", "<pod2>", "<pod3>"],
   "alert_type": "cascade|contention|lifecycle",
   "confidence": 0.0,
-  "insight": "<2-3 sentences in plain English for a field engineer>",
-  "recommendation": "<1 sentence action>"
+  "insight": "<2-3 sentences describing what the evidence shows, in plain English for a field engineer>",
+  "recommendation": "<1 sentence action based on the evidence>"
 }}
 ```
 
@@ -130,16 +133,19 @@ class Orchestrator:
     def _build_user_message(self, bundle: CorrelatedSignalBundle) -> str:
         findings_text = json.dumps(bundle.findings, indent=2, default=str)
         return f"""CORRELATED ANOMALY BUNDLE:
-Trigger reason: {bundle.trigger_reason}
-Unique agents: {', '.join(bundle.unique_agents)}
-Affected pods: {', '.join(bundle.unique_pods)}
-Finding count: {len(bundle.findings)}
-Severity counts: {bundle.severity_counts}
+    Trigger reason: {bundle.trigger_reason}
+    Unique agents: {', '.join(bundle.unique_agents)}
+    Affected pods: {', '.join(bundle.unique_pods)}
+    Finding count: {len(bundle.findings)}
+    Severity counts: {bundle.severity_counts}
 
-FINDINGS:
-{findings_text}
+    FINDINGS:
+    {findings_text}
 
-Investigate this event. Use tools to gather context, then provide your analysis."""
+    Investigate this event. Use tools to gather context.
+    For pump_health_critical findings, always fetch feature-extractor logs
+    to determine the specific fault signature before concluding.
+    Then provide your analysis."""
 
     def _extract_json_result(self, content: str) -> Optional[Dict]:
         import re
@@ -183,7 +189,7 @@ Investigate this event. Use tools to gather context, then provide your analysis.
                     max_tokens=2000,
                 )
             except Exception as e:
-                log.error("Groq API error: %s", e)
+                log.error("LLM API error: %s", e)
                 break
 
             message = response.choices[0].message
