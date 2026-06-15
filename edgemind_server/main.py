@@ -181,6 +181,11 @@ async def get_agent_status():
         }
     return JSONResponse(status)
 
+@app.delete("/api/alerts")
+async def clear_alerts():
+    _recent_alerts.clear()
+    return JSONResponse({"cleared": True})
+
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────
 
