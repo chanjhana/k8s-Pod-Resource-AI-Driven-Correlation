@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 LLM_API_KEY = os.environ.get("LLM_API_KEY", os.environ.get("GROQ_API_KEY", ""))
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1")
 LLM_MODEL = os.environ.get("LLM_MODEL", os.environ.get("GROQ_MODEL", "gpt-5.4-nano"))
-MAX_TOOL_TURNS = 4
+MAX_ANALYSIS_TIME_S = 60
 
 # Static system prompt — no dynamic content so OpenAI can cache it automatically.
 # The dependency graph moves to the user message (dynamic per-call context).
@@ -170,6 +170,22 @@ back to its origin, then provide your analysis."""
             pass
         return None
 
+    def _force_final_answer(self, messages: list) -> str:
+        """One extra call with tool_choice='none' to obtain the JSON conclusion."""
+        try:
+            resp = self._client.chat.completions.create(
+                model=LLM_MODEL,
+                messages=messages,
+                tools=TOOL_DEFINITIONS,
+                tool_choice="none",
+                temperature=0.1,
+                max_completion_tokens=2000,
+            )
+            return resp.choices[0].message.content or ""
+        except Exception as e:
+            log.error("LLM API error (force final): %s", e)
+            return ""
+
     def analyze(self, bundle: CorrelatedSignalBundle) -> OrchestratorResult:
         """Run full orchestrator analysis. Synchronous — call in thread pool."""
         start_time = time.time()
@@ -182,9 +198,18 @@ back to its origin, then provide your analysis."""
 
         tool_calls_made = []
         final_content = ""
+        seen_calls: set = set()
+        turn = 0
 
-        for turn in range(MAX_TOOL_TURNS + 1):
-            log.info("Orchestrator turn %d/%d", turn + 1, MAX_TOOL_TURNS + 1)
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed > MAX_ANALYSIS_TIME_S:
+                log.warning("Analysis timeout after %.1fs — forcing final answer", elapsed)
+                final_content = self._force_final_answer(messages)
+                break
+
+            turn += 1
+            log.info("Orchestrator turn %d (%.1fs elapsed)", turn, elapsed)
             try:
                 response = self._client.chat.completions.create(
                     model=LLM_MODEL,
@@ -203,12 +228,13 @@ back to its origin, then provide your analysis."""
             content = message.content or ""
 
             # Log cache usage if available
-            if hasattr(response, "usage") and response.usage:
-                cached = getattr(response.usage, "prompt_tokens_details", None)
-                if cached:
-                    cached_tokens = getattr(cached, "cached_tokens", 0)
-                    if cached_tokens:
-                        log.info("Prompt cache hit: %d cached tokens", cached_tokens)
+            usage = getattr(response, "usage", None)
+            if usage:
+                details = getattr(usage, "prompt_tokens_details", None)
+                if details:
+                    cached = getattr(details, "cached_tokens", 0)
+                    if cached:
+                        log.info("Cache hit: %d tokens cached", cached)
 
             messages.append(message)
 
@@ -216,6 +242,9 @@ back to its origin, then provide your analysis."""
                 final_content = content
                 break
 
+            # Execute tool calls; deduplicate by tool-name-prefixed key so
+            # the model can't loop on the same fetch indefinitely.
+            executed_any = False
             for tc in tool_calls:
                 tool_name = tc.function.name
                 try:
@@ -223,15 +252,40 @@ back to its origin, then provide your analysis."""
                 except json.JSONDecodeError:
                     tool_args = {}
 
-                log.info("Tool call: %s(%s)", tool_name, list(tool_args.keys()))
-                tool_calls_made.append(tool_name)
-                result = execute_tool(tool_name, tool_args)
+                if tool_name == "query_prometheus":
+                    dedup_key = f"query_prometheus:{tool_args.get('promql', '')}"
+                elif tool_name == "get_pod_logs":
+                    dedup_key = f"get_pod_logs:{tool_args.get('pod_name', '')}/{tool_args.get('namespace', '')}"
+                elif tool_name == "get_kubernetes_events":
+                    dedup_key = f"get_kubernetes_events:{tool_args.get('namespace', '')}/{tool_args.get('pod_name', '')}"
+                else:
+                    dedup_key = f"{tool_name}:{sorted(tool_args.items())}"
 
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": result,
-                })
+                if dedup_key in seen_calls:
+                    log.warning("Duplicate tool call skipped: %s", dedup_key)
+                    # Must still respond to every tool_call_id in the assistant
+                    # message or the next API call will fail validation.
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": "[Duplicate call — result already fetched this session. Do not repeat this call.]",
+                    })
+                else:
+                    seen_calls.add(dedup_key)
+                    executed_any = True
+                    log.info("Tool call: %s(%s)", tool_name, list(tool_args.keys()))
+                    tool_calls_made.append(tool_name)
+                    result = execute_tool(tool_name, tool_args)
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": result,
+                    })
+
+            if not executed_any:
+                log.warning("All tool calls were duplicates — forcing final answer")
+                final_content = self._force_final_answer(messages)
+                break
 
         duration = time.time() - start_time
         result_json = self._extract_json_result(final_content)
