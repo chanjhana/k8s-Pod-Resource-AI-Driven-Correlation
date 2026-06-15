@@ -33,8 +33,10 @@ MIN_AGENTS_FOR_TRIGGER = 2   # 2+ different agents = trigger
 
 # Only these anomaly types bypass multi-agent requirement when critical.
 # Noisy transient types (volume_mount_failure, log_error_surge) require corroboration.
+
 CRITICAL_ANOMALY_TYPES_IMMEDIATE = {
-    "oom_kill", "cpu_spike", "memory_leak", "pvc_fill",
+    "oomkill_detected", "k8s_oomkill",
+    "cpu_spike", "memory_leak", "pvc_fill",
     "network_flood", "io_saturation",
 }
 
@@ -43,12 +45,9 @@ MONITORED_NAMESPACES = {"pump-station"}
 
 SINGLE_AGENT_SUFFICIENT = {
     "pump_health_critical",
-    "oom_kill",
-    "cpu_spike",
-    "memory_leak", 
-    "pvc_fill",
-    "network_flood",
-    "io_saturation",
+    "oomkill_detected", "k8s_oomkill",
+    "cpu_spike", "memory_leak",
+    "pvc_fill", "network_flood", "io_saturation",
 }
 
 

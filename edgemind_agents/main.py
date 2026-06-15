@@ -3,7 +3,6 @@ import logging
 import os
 import signal
 import sys
-from tracemalloc import start
 
 import redis.asyncio as aioredis
 from kubernetes import client as k8s_client, config as k8s_config

@@ -70,6 +70,9 @@ _graph: Optional[DependencyGraph] = None
 _orchestrator: Optional[Orchestrator] = None
 _executor = ThreadPoolExecutor(max_workers=1)  # One orchestrator call at a time
 
+# Track IDs of findings already relayed (to avoid duplicates)
+_relayed_ids: set = set()
+
 
 async def _broadcast_to_ws(message: Dict[str, Any]) -> None:
     """Send a message to all connected WebSocket clients."""
@@ -121,23 +124,23 @@ async def _on_correlated_bundle(bundle: CorrelatedSignalBundle) -> None:
 
 
 async def _finding_relay_loop() -> None:
-    """Subscribe to Redis findings and relay to WebSocket clients."""
+    last_seen = 0
     while True:
         try:
-            result = await _redis.brpop("edgemind:findings", timeout=1)
-            if result:
-                _, payload = result
+            # Non-destructive: read without consuming
+            findings = await _redis.lrange("edgemind:findings", 0, 9)
+            for payload in findings:
                 finding = json.loads(payload)
-                _recent_findings.appendleft(finding)
-                await _broadcast_to_ws({
-                    "type": "finding",
-                    "data": finding,
-                })
+                fid = finding.get("finding_id", "")
+                if fid and fid not in _relayed_ids:
+                    _relayed_ids.add(fid)
+                    _recent_findings.appendleft(finding)
+                    await _broadcast_to_ws({"type": "finding", "data": finding})
         except asyncio.CancelledError:
             raise
         except Exception as e:
             log.warning("Finding relay error: %s", e)
-            await asyncio.sleep(1)
+        await asyncio.sleep(2)
 
 
 # ── REST endpoints ────────────────────────────────────────────────────────────

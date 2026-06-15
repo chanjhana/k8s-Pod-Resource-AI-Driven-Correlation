@@ -15,7 +15,9 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 from kubernetes import client as k8s_client
+from datetime import datetime, timezone
 
+_EPOCH = datetime.min.replace(tzinfo=timezone.utc)
 log = logging.getLogger(__name__)
 
 PROMETHEUS_URL = os.environ.get(
@@ -213,7 +215,7 @@ def get_kubernetes_events(
             field_selector=f"involvedObject.name={pod_name}" if pod_name else None,
         )
         formatted = []
-        for e in sorted(events.items, key=lambda x: x.last_timestamp or "", reverse=True)[:15]:
+        for e in sorted(events.items, key=lambda x: x.last_timestamp or _EPOCH, reverse=True)[:15]:
             formatted.append({
                 "reason": e.reason,
                 "message": e.message,
