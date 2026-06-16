@@ -26,6 +26,8 @@ log = logging.getLogger(__name__)
 
 LLM_API_KEY = os.environ.get("LLM_API_KEY", os.environ.get("GROQ_API_KEY", ""))
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1")
+
+PUMP_TO_SENSOR = {"pump1": "sensor-sim-1", "pump2": "sensor-sim-2", "pump3": "sensor-sim-3"}
 LLM_MODEL = os.environ.get("LLM_MODEL", os.environ.get("GROQ_MODEL", "gpt-5.4-mini"))
 MAX_ANALYSIS_TIME_S = 60
 
@@ -313,6 +315,23 @@ back to its origin, then provide your analysis."""
         if result_json:
             root_cause = self._clean_pod_name(result_json.get("root_cause_pod", "unknown"))
             causal_chain = [self._clean_pod_name(p) for p in result_json.get("causal_chain", [])]
+
+            # Deterministic correction: pump_health_critical findings must map to
+            # the sensor-sim pod for the affected pump, regardless of model output.
+            for finding in bundle.findings:
+                if finding.get("anomaly_type") == "pump_health_critical" and "pump" in finding:
+                    correct_sensor = PUMP_TO_SENSOR.get(finding["pump"])
+                    if correct_sensor and root_cause != correct_sensor:
+                        log.warning(
+                            "Correcting root_cause_pod from %s to %s based on pump field",
+                            root_cause,
+                            correct_sensor,
+                        )
+                        root_cause = correct_sensor
+                        if correct_sensor not in causal_chain:
+                            causal_chain.insert(0, correct_sensor)
+                    break
+
             log.info(
                 "Analysis complete: root_cause=%s confidence=%.2f duration=%.1fs",
                 root_cause,
