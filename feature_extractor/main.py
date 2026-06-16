@@ -121,8 +121,12 @@ async def run_cycle(query_api, write_api) -> None:
             p.field(field, float(value))
         points.append(p)
         log.info(
-            "pump=%s samples=%d bearing_health=%.1f vib_trend=%.4f",
+            "pump=%s samples=%d bearing_health=%.1f vib_trend=%.4f"
+            " radial_trend=%.4f tangential_trend=%.4f axial_trend=%.4f"
+            " temp_trend=%.4f rpm_trend=%.4f",
             pump_id, len(times_s), feats["bearing_health"], feats["vibration_rms_trend"],
+            feats["radial_trend"], feats["tangential_trend"], feats["axial_trend"],
+            feats["temp_trend"], feats["rpm_trend"],
         )
 
     if points:

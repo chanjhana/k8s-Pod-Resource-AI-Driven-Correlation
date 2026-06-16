@@ -27,9 +27,14 @@ from scipy import stats
 
 from common.contract import (
     F_AXIAL_DOMINANCE,
+    F_AXIAL_TREND,
     F_BEARING_HEALTH,
+    F_RADIAL_TREND,
     F_RPM_STABILITY,
+    F_RPM_TREND,
+    F_TANGENTIAL_TREND,
     F_TEMP_RATE,
+    F_TEMP_TREND,
     F_VIB_RMS_TREND,
     axial_baseline,
     vib_rms_baseline,
@@ -118,4 +123,9 @@ def compute_features(
         F_TEMP_RATE: _slope(times_s, temp),
         F_RPM_STABILITY: rpm_std,
         F_BEARING_HEALTH: bearing_health(mean_vib_rms, vib_rms_baseline(pump_id), mean_temp, rpm_std),
+        F_RADIAL_TREND: _slope(times_s, r),
+        F_TANGENTIAL_TREND: _slope(times_s, t),
+        F_AXIAL_TREND: _slope(times_s, a),
+        F_TEMP_TREND: _slope(times_s, temp),
+        F_RPM_TREND: _slope(times_s, speed),
     }

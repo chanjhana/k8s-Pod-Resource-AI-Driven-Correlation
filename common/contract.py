@@ -130,6 +130,11 @@ F_AXIAL_DOMINANCE = "axial_dominance_ratio"
 F_TEMP_RATE = "temp_rate_of_change"
 F_RPM_STABILITY = "rpm_stability"
 F_BEARING_HEALTH = "bearing_health"
+F_RADIAL_TREND = "radial_trend"
+F_TANGENTIAL_TREND = "tangential_trend"
+F_AXIAL_TREND = "axial_trend"
+F_TEMP_TREND = "temp_trend"
+F_RPM_TREND = "rpm_trend"
 
 FEATURE_FIELDS: List[str] = [
     F_VIB_RMS_TREND,
@@ -137,6 +142,11 @@ FEATURE_FIELDS: List[str] = [
     F_TEMP_RATE,
     F_RPM_STABILITY,
     F_BEARING_HEALTH,
+    F_RADIAL_TREND,
+    F_TANGENTIAL_TREND,
+    F_AXIAL_TREND,
+    F_TEMP_TREND,
+    F_RPM_TREND,
 ]
 
 # Health state written by health-scorer (every 30 s).

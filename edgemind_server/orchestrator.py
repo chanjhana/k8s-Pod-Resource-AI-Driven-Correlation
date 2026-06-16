@@ -44,8 +44,14 @@ CONFIDENCE SCORING:
 INVESTIGATION STEPS:
 1. Read findings — identify affected pods and anomaly types
 2. Use query_prometheus to check resource metrics on pods in the causal chain
-3. Use get_pod_logs on the affected pod AND its upstream dependencies to gather
-   raw evidence — error messages, metric values, trends, timestamps
+3. Use get_pod_logs on feature-extractor to gather the full set of trend
+   metrics for the affected pump: bearing_health, vib_trend, radial_trend,
+   tangential_trend, axial_trend, temp_trend, rpm_trend. Compare which specific
+   components are changing and in what direction/magnitude — this tells you
+   the actual physical nature of the degradation (e.g. axial-only vs radial+tangential
+   vs temperature-driven vs sudden step-change vs gradual drift). Describe what
+   you observe in the insight using the specific components involved, not just
+   'bearing health dropped.'
 4. Use get_kubernetes_events if lifecycle issues are suspected
 5. Reason from the evidence to identify root cause — do not assume a fault type,
    let the data guide your conclusion
