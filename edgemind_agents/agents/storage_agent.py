@@ -45,6 +45,7 @@ class StorageAgent(BaseAgent):
         # pvc_name -> set of container names that mount it
         self._pvc_pod_map: Dict[str, Set[str]] = {}
         self._last_pvc_refresh: float = -999.0  # force refresh on first process() call
+        self._last_pvc_fill_alert: Dict[str, float] = {}
 
     async def _refresh_pvc_map(self) -> None:
         now = time.monotonic()
@@ -223,6 +224,10 @@ class StorageAgent(BaseAgent):
             severity = SEV_CRITICAL if ttf_hours is not None and ttf_hours < STORAGE_TTF_CRIT_HOURS \
                 else SEV_WARNING
 
+            _last = self._last_pvc_fill_alert.get(pvc_name, 0.0)
+            if time.monotonic() - _last < 300.0:
+                continue
+            self._last_pvc_fill_alert[pvc_name] = time.monotonic()
             await self.publish_finding({
                 "anomaly_type": PVC_FILL,
                 "severity": severity,

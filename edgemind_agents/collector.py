@@ -39,7 +39,7 @@ BATCH_QUERIES = {
     "node_mem_available": "node_memory_MemAvailable_bytes",
     "node_mem_total": "node_memory_MemTotal_bytes",
     "pvc_used": "kubelet_volume_stats_used_bytes",
-    "pvc_capacity": "kubelet_volume_stats_capacity_bytes",
+    "pvc_capacity": "kube_persistentvolumeclaim_resource_requests_storage_bytes",
     "fs_writes": (
         f'rate(container_fs_writes_bytes_total{{container!="",'
         f'namespace=~"{WATCHED_NAMESPACES}"}}[1m])'
