@@ -3,18 +3,28 @@ main.py — edgemind-server runtime.
 
 FastAPI + WebSocket server that wires:
   - CorrelationFilter (reads Redis findings)
-  - Orchestrator (Qwen3:8b via Ollama)
+  - Orchestrator (OpenAI-compatible LLM)
   - DependencyGraph (K8s topology)
 
 REST endpoints:
   GET  /health              liveness
   GET  /api/alerts          recent AI analyses (last 50)
   GET  /api/dependency-graph  current pod topology
+  GET  /api/graph           alias for /api/dependency-graph
   GET  /api/findings        recent raw findings from Redis
   GET  /api/agent-status    heartbeat status of 4 agents
+  GET  /api/metrics         current pod + PVC metrics from Prometheus
+  DELETE /api/alerts        clear alert history + cooldown
 
 WebSocket:
   WS   /ws                  streams findings + AI analyses to dashboard
+
+WS event types emitted:
+  initial_state   — on connect: recent findings, alerts, graph
+  agent_finding   — each new finding relayed from Redis
+  correlated_alert — AI analysis result (with nlp_summary, llm_available)
+  metric_update   — pod + PVC metrics snapshot every METRIC_BROADCAST_INTERVAL s
+  agent_heartbeat — agent liveness pulse every HEARTBEAT_BROADCAST_INTERVAL s
 """
 
 import asyncio
@@ -22,10 +32,11 @@ import json
 import logging
 import os
 import sys
+import urllib.parse
+import urllib.request
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, Optional, Set
 
 import redis.asyncio as aioredis
 import uvicorn
@@ -50,6 +61,9 @@ log = logging.getLogger("edgemind.server")
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "8080"))
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis-svc.monitoring.svc.cluster.local:6379")
+PROMETHEUS_URL = os.environ.get("PROMETHEUS_URL", "http://prometheus-svc.monitoring.svc.cluster.local:9090")
+METRIC_BROADCAST_INTERVAL = int(os.environ.get("METRIC_BROADCAST_INTERVAL", "15"))
+HEARTBEAT_BROADCAST_INTERVAL = int(os.environ.get("HEARTBEAT_BROADCAST_INTERVAL", "30"))
 
 # In-memory stores
 _recent_alerts: deque = deque(maxlen=50)
@@ -69,10 +83,104 @@ _redis: Optional[aioredis.Redis] = None
 _graph: Optional[DependencyGraph] = None
 _orchestrator: Optional[Orchestrator] = None
 _correlation_filter: Optional[CorrelationFilter] = None
-_executor = ThreadPoolExecutor(max_workers=1)  # One orchestrator call at a time
+_executor = ThreadPoolExecutor(max_workers=2)
 
 # Track IDs of findings already relayed (to avoid duplicates)
 _relayed_ids: set = set()
+
+
+# ── Prometheus scraper ────────────────────────────────────────────────────────
+
+_PROM_QUERIES = {
+    "cpu_usage":       'sum by (pod,namespace) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[1m]))',
+    "cpu_throttle":    'sum by (pod,namespace) (rate(container_cpu_cfs_throttled_seconds_total{container!="",container!="POD"}[1m]) / (rate(container_cpu_cfs_periods_total{container!="",container!="POD"}[1m]) + 1))',
+    "mem_rss":         'sum by (pod,namespace) (container_memory_rss{container!="",container!="POD"})',
+    "mem_working_set": 'sum by (pod,namespace) (container_memory_working_set_bytes{container!="",container!="POD"})',
+    "net_tx":          'sum by (pod,namespace) (rate(container_network_transmit_bytes_total[1m]))',
+    "net_rx":          'sum by (pod,namespace) (rate(container_network_receive_bytes_total[1m]))',
+    "fs_write":        'sum by (pod,namespace) (rate(container_fs_writes_bytes_total{container!="",container!="POD"}[1m]))',
+    "fs_read":         'sum by (pod,namespace) (rate(container_fs_reads_bytes_total{container!="",container!="POD"}[1m]))',
+    "fs_io_time":      'sum by (pod,namespace) (rate(container_fs_io_time_seconds_total{container!="",container!="POD"}[1m]))',
+    "cpu_limit":       'sum by (pod,namespace) (kube_pod_container_resource_limits{resource="cpu",container!=""})',
+    "mem_limit":       'sum by (pod,namespace) (kube_pod_container_resource_limits{resource="memory",container!=""})',
+    "restarts":        'sum by (pod,namespace) (kube_pod_container_status_restarts_total)',
+}
+
+
+def _prom_instant(query: str) -> Dict[str, float]:
+    url = f"{PROMETHEUS_URL}/api/v1/query?" + urllib.parse.urlencode({"query": query})
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            body = json.loads(resp.read())
+        result: Dict[str, float] = {}
+        for item in body.get("data", {}).get("result", []):
+            pod = item["metric"].get("pod", "")
+            if pod:
+                try:
+                    result[pod] = float(item["value"][1])
+                except (IndexError, ValueError):
+                    pass
+        return result
+    except Exception as exc:
+        log.debug("Prometheus query failed (%s): %s", query[:60], exc)
+        return {}
+
+
+def _pvc_instant(metric: str) -> Dict[str, float]:
+    url = f"{PROMETHEUS_URL}/api/v1/query?" + urllib.parse.urlencode({"query": metric})
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            body = json.loads(resp.read())
+        result: Dict[str, float] = {}
+        for item in body.get("data", {}).get("result", []):
+            pvc = item["metric"].get("persistentvolumeclaim", "")
+            if pvc:
+                try:
+                    result[pvc] = float(item["value"][1])
+                except (IndexError, ValueError):
+                    pass
+        return result
+    except Exception as exc:
+        log.debug("PVC query failed (%s): %s", metric, exc)
+        return {}
+
+
+def _scrape_metrics() -> Dict[str, Any]:
+    """Blocking: scrape all pod + PVC metrics from Prometheus."""
+    series = {k: _prom_instant(q) for k, q in _PROM_QUERIES.items()}
+
+    all_pods: set = set()
+    for v in series.values():
+        all_pods.update(v.keys())
+
+    pods: Dict[str, Any] = {}
+    for pod in all_pods:
+        pods[pod] = {k: series[k].get(pod) for k in series}
+
+    pvc_used = _pvc_instant("kubelet_volume_stats_used_bytes")
+    pvc_cap = _pvc_instant("kubelet_volume_stats_capacity_bytes")
+    pvcs: Dict[str, Any] = {}
+    for pvc in set(pvc_used) | set(pvc_cap):
+        pvcs[pvc] = {
+            "used_bytes":     pvc_used.get(pvc),
+            "capacity_bytes": pvc_cap.get(pvc),
+        }
+
+    from datetime import datetime, timezone
+    return {"pods": pods, "pvcs": pvcs, "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+def _normalize_alert(result_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Add frontend-expected fields to orchestrator result dict."""
+    out = dict(result_dict)
+    out["nlp_summary"] = out.get("nlp_summary") or out.get("insight", "")
+    out.setdefault("llm_available", True)
+    out.setdefault("causal_chain", [])
+    out.setdefault("root_cause_pod", None)
+    out.setdefault("alert_type", "unknown")
+    out.setdefault("confidence", 0.0)
+    out.setdefault("recommendation", "")
+    return out
 
 
 async def _broadcast_to_ws(message: Dict[str, Any]) -> None:
@@ -93,13 +201,6 @@ async def _on_correlated_bundle(bundle: CorrelatedSignalBundle) -> None:
     """Called by correlation filter when a trigger fires."""
     log.info("Orchestrator triggered: %s", bundle.trigger_reason)
 
-    # Broadcast the bundle to dashboard immediately (before LLM responds)
-    await _broadcast_to_ws({
-        "type": "correlation_trigger",
-        "data": bundle.to_dict(),
-    })
-
-    # Run orchestrator in thread pool (blocking LLM call)
     loop = asyncio.get_running_loop()
     try:
         result = await loop.run_in_executor(
@@ -109,23 +210,29 @@ async def _on_correlated_bundle(bundle: CorrelatedSignalBundle) -> None:
         )
         result_dict = result.to_dict()
         result_dict["bundle"] = bundle.to_dict()
+        result_dict = _normalize_alert(result_dict)
         _recent_alerts.appendleft(result_dict)
 
-        # Broadcast AI result to dashboard
-        await _broadcast_to_ws({
-            "type": "ai_analysis",
-            "data": result_dict,
-        })
+        await _broadcast_to_ws({"type": "correlated_alert", "data": result_dict})
         log.info(
             "Analysis complete: root_cause=%s confidence=%.2f duration=%.1fs",
             result.root_cause_pod, result.confidence, result.analysis_duration_s,
         )
     except Exception as e:
         log.error("Orchestrator failed: %s", e, exc_info=True)
+        await _broadcast_to_ws({
+            "type": "correlated_alert",
+            "data": _normalize_alert({
+                "llm_available": False,
+                "bundle": bundle.to_dict(),
+                "insight": "LLM analysis unavailable.",
+                "causal_chain": [],
+                "confidence": 0.0,
+            }),
+        })
 
 
 async def _finding_relay_loop() -> None:
-    last_seen = 0
     while True:
         try:
             # Non-destructive: read without consuming
@@ -136,12 +243,45 @@ async def _finding_relay_loop() -> None:
                 if fid and fid not in _relayed_ids:
                     _relayed_ids.add(fid)
                     _recent_findings.appendleft(finding)
-                    await _broadcast_to_ws({"type": "finding", "data": finding})
+                    await _broadcast_to_ws({"type": "agent_finding", "data": finding})
         except asyncio.CancelledError:
             raise
         except Exception as e:
             log.warning("Finding relay error: %s", e)
         await asyncio.sleep(2)
+
+
+async def _metric_broadcast_loop() -> None:
+    """Scrape Prometheus every METRIC_BROADCAST_INTERVAL s and broadcast metric_update."""
+    loop = asyncio.get_running_loop()
+    while True:
+        await asyncio.sleep(METRIC_BROADCAST_INTERVAL)
+        try:
+            snapshot = await loop.run_in_executor(_executor, _scrape_metrics)
+            await _broadcast_to_ws({"type": "metric_update", "data": snapshot})
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.warning("Metric broadcast error: %s", e)
+
+
+async def _heartbeat_broadcast_loop() -> None:
+    """Poll Redis heartbeat keys and broadcast agent_heartbeat events."""
+    agents = ["cpu", "memory", "storage", "network_log"]
+    while True:
+        await asyncio.sleep(HEARTBEAT_BROADCAST_INTERVAL)
+        try:
+            for agent in agents:
+                val = await _redis.get(f"edgemind:heartbeat:{agent}")
+                if val:
+                    await _broadcast_to_ws({
+                        "type": "agent_heartbeat",
+                        "data": {"agent": agent, "timestamp": val},
+                    })
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            log.warning("Heartbeat broadcast error: %s", e)
 
 
 # ── REST endpoints ────────────────────────────────────────────────────────────
@@ -153,7 +293,7 @@ async def health():
 @app.get("/api/alerts")
 async def get_alerts(limit: int = 20):
     return JSONResponse({
-        "alerts": list(_recent_alerts)[:limit],
+        "alerts": [_normalize_alert(a) for a in list(_recent_alerts)[:limit]],
         "count": len(_recent_alerts),
     })
 
@@ -167,6 +307,23 @@ async def get_findings(limit: int = 50):
 @app.get("/api/dependency-graph")
 async def get_dependency_graph():
     return JSONResponse(_graph.to_json() if _graph else {})
+
+@app.get("/api/graph")
+async def get_graph():
+    """Alias for /api/dependency-graph."""
+    return JSONResponse(_graph.to_json() if _graph else {})
+
+@app.get("/api/metrics")
+async def get_metrics():
+    """Return current pod + PVC metrics snapshot from Prometheus."""
+    loop = asyncio.get_running_loop()
+    try:
+        snapshot = await loop.run_in_executor(_executor, _scrape_metrics)
+        return JSONResponse(snapshot)
+    except Exception as e:
+        log.warning("Metrics endpoint error: %s", e)
+        from datetime import datetime, timezone
+        return JSONResponse({"pods": {}, "pvcs": {}, "timestamp": datetime.now(timezone.utc).isoformat()})
 
 @app.get("/api/agent-status")
 async def get_agent_status():
@@ -200,13 +357,21 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         # Send current state on connect
         await ws.send_text(json.dumps({
-            "type": "init",
+            "type": "initial_state",
             "data": {
                 "recent_findings": list(_recent_findings)[:20],
-                "recent_alerts": list(_recent_alerts)[:5],
+                "recent_alerts": [_normalize_alert(a) for a in list(_recent_alerts)[:5]],
                 "dependency_graph": _graph.to_json() if _graph else {},
             }
         }, default=str))
+        # Emit current heartbeats immediately so dashboard doesn't wait 30s
+        for agent in ["cpu", "memory", "storage", "network_log"]:
+            val = await _redis.get(f"edgemind:heartbeat:{agent}")
+            if val:
+                await ws.send_text(json.dumps({
+                    "type": "agent_heartbeat",
+                    "data": {"agent": agent, "timestamp": val},
+                }, default=str))
         # Keep alive
         while True:
             await ws.receive_text()
@@ -245,6 +410,8 @@ async def startup():
     # Start background tasks
     asyncio.create_task(_run_correlation_filter())
     asyncio.create_task(_finding_relay_loop())
+    asyncio.create_task(_metric_broadcast_loop())
+    asyncio.create_task(_heartbeat_broadcast_loop())
 
     log.info("edgemind-server ready on %s:%d", HOST, PORT)
 
