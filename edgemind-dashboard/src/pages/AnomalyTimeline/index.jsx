@@ -19,12 +19,16 @@ export default function AnomalyTimeline() {
         paused={paused} setPaused={setPaused}
         panOffsetMs={panOffsetMs} setPanOffsetMs={setPanOffsetMs}
       />
-      <TimelineCanvas
-        windowMs={windowMs} typeFilter={typeFilter}
-        nsFilter={nsFilter} paused={paused}
-        panOffsetMs={panOffsetMs}
-      />
-      <HistoryPanel typeFilter={typeFilter} nsFilter={nsFilter} windowMs={windowMs} panOffsetMs={panOffsetMs} />
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ minHeight: 420, flexShrink: 0 }}>
+          <TimelineCanvas
+            windowMs={windowMs} typeFilter={typeFilter}
+            nsFilter={nsFilter} paused={paused}
+            panOffsetMs={panOffsetMs}
+          />
+        </div>
+        <HistoryPanel typeFilter={typeFilter} nsFilter={nsFilter} windowMs={windowMs} panOffsetMs={panOffsetMs} />
+      </div>
     </div>
   )
 }

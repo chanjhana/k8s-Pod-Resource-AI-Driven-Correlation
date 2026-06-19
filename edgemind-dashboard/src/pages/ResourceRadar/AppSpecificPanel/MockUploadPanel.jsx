@@ -1,8 +1,9 @@
 import { useAppState } from '../../../core/store/AppContext.jsx'
+import { findMetrics } from '../../../core/selectors/podHealth.js'
 
 export default function MockUploadPanel({ podName }) {
   const { metrics } = useAppState()
-  const m = metrics[podName] || {}
+  const m = findMetrics(metrics, podName)
 
   const netRxArr = m.net_rx || []
   const netRx = netRxArr.length ? netRxArr[netRxArr.length - 1] : null

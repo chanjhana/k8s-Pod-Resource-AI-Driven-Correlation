@@ -2,11 +2,12 @@ import { useAppState } from '../../../core/store/AppContext.jsx'
 import { POD_ROLES } from '../../../core/constants/pods.js'
 import PvcGauge from '../../../components/ui/PvcGauge.jsx'
 import TrendSparkline from '../../../components/charts/TrendSparkline.jsx'
+import { findMetrics } from '../../../core/selectors/podHealth.js'
 
 export default function InfraOnlyPanel({ podName }) {
   const { pvcs, metrics } = useAppState()
   const role = POD_ROLES[podName] || 'Infrastructure component'
-  const m = metrics[podName] || {}
+  const m = findMetrics(metrics, podName)
   const isPrometheus = podName === 'prometheus'
   const promPvc = pvcs['prometheus-tsdb'] || {}
 

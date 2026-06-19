@@ -3,13 +3,14 @@ import RollingLineChart from './RollingLineChart.jsx'
 import DualLineChart from './DualLineChart.jsx'
 import StackedAreaChart from './StackedAreaChart.jsx'
 import { useAppState } from '../../core/store/AppContext.jsx'
+import { findMetrics } from '../../core/selectors/podHealth.js'
 
 const TABS = ['CPU', 'Memory', 'Network', 'Storage']
 
 export default function MetricTabs({ podName }) {
   const [tab, setTab] = useState('CPU')
   const { metrics } = useAppState()
-  const m = metrics[podName] || {}
+  const m = findMetrics(metrics, podName)
 
   return (
     <div>

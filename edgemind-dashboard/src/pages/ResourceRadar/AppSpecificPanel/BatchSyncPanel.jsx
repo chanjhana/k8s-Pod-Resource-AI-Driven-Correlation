@@ -1,11 +1,12 @@
 import { useAppState } from '../../../core/store/AppContext.jsx'
 import PvcGauge from '../../../components/ui/PvcGauge.jsx'
 import TrendSparkline from '../../../components/charts/TrendSparkline.jsx'
+import { findMetrics } from '../../../core/selectors/podHealth.js'
 
 export default function BatchSyncPanel({ podName }) {
   const { pvcs, metrics } = useAppState()
   const exportPvc = pvcs['export-data'] || {}
-  const m = metrics[podName] || {}
+  const m = findMetrics(metrics, podName)
 
   const fsReadArr = m.fs_read || []
   const fsRead = fsReadArr.length ? fsReadArr[fsReadArr.length - 1] : null

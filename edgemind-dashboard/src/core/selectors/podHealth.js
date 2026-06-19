@@ -1,4 +1,12 @@
 // Shared pod-health selectors derived from agent findings.
+
+// Prometheus returns full pod names (with ReplicaSet+pod hash suffixes).
+// Match by prefix so short names like "sensor-sim-1" find "sensor-sim-1-567f6f796d-vrhz6".
+export function findMetrics(metrics, podName) {
+  if (metrics[podName]) return metrics[podName]
+  const key = Object.keys(metrics).find(k => k.startsWith(podName + '-'))
+  return key ? metrics[key] : {}
+}
 // Used by the Command Center KPI strip and the pod-health heatmap so both
 // agree on a single source of truth (replaces the ad-hoc podIsCritical in
 // the old VitalCards and the local helper in StatusStrip).

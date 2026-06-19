@@ -2,7 +2,7 @@
 import EventBlock from './EventBlock.jsx'
 
 function TimelineRow({ podName, findings, xScale, rowHeight, windowMs }) {
-  const podFindings = findings.filter(f => f.pod === podName)
+  const podFindings = findings.filter(f => f.pod && (f.pod === podName || f.pod.startsWith(podName + '-')))
 
   return (
     <div style={{ height: rowHeight, position: 'relative', borderBottom: '1px solid var(--color-border-card)' }}>

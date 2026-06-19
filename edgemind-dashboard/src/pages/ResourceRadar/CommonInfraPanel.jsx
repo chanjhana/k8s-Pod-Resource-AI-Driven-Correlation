@@ -1,9 +1,10 @@
 import MetricTabs from '../../components/charts/MetricTabs.jsx'
 import { useAppState } from '../../core/store/AppContext.jsx'
+import { findMetrics } from '../../core/selectors/podHealth.js'
 
 export default function CommonInfraPanel({ podName }) {
   const { metrics, findings } = useAppState()
-  const m = metrics[podName] || {}
+  const m = findMetrics(metrics, podName)
   const restarts = m.restarts || 0
   const podFindings = findings.filter(f => f.pod === podName)
 

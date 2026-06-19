@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useAppState } from '../../../core/store/AppContext.jsx'
 import MiniProgressBar from '../../../components/ui/MiniProgressBar.jsx'
+import { findMetrics } from '../../../core/selectors/podHealth.js'
 
 function StatBox({ label, value }) {
   return (
@@ -65,7 +66,7 @@ export default function EdgeMindServerPanel({ podName }) {
   const navigate = useNavigate()
   const { correlatedAlerts, findings, ws: wsStatus, metrics } = useAppState()
 
-  const m = metrics[podName] || {}
+  const m = findMetrics(metrics, podName)
   const cpuArr = m.cpu_usage || []
   const cpu = cpuArr.length ? cpuArr[cpuArr.length - 1] : null
   const cpuLimit = m.cpu_limit || null

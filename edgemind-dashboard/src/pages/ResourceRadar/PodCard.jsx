@@ -15,9 +15,15 @@ const NS_STYLE = {
   'kube-system':  { bg: 'var(--color-overlay)', color: 'var(--color-text-tertiary)' },
 }
 
+function findMetrics(metrics, podName) {
+  if (metrics[podName]) return metrics[podName]
+  const key = Object.keys(metrics).find(k => k.startsWith(podName + '-'))
+  return key ? metrics[key] : {}
+}
+
 export default function PodCard({ podName, onClick }) {
   const { metrics, findings, sensorReadings } = useAppState()
-  const m = metrics[podName] || {}
+  const m = findMetrics(metrics, podName)
 
   const cpuArr = m.cpu_usage || []
   const cpu = cpuArr.length ? cpuArr[cpuArr.length - 1] : null

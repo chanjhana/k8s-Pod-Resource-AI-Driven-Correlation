@@ -2,6 +2,7 @@
 import { useAppState } from '../../../core/store/AppContext.jsx'
 import TrendSparkline from '../../../components/charts/TrendSparkline.jsx'
 import IsoZoneBadge from '../../../components/ui/IsoZoneBadge.jsx'
+import { findMetrics } from '../../../core/selectors/podHealth.js'
 
 const PUMPS = ['pump1', 'pump2', 'pump3']
 
@@ -47,7 +48,7 @@ function PumpBearingRow({ pump, alertsByPump, sensorReadings }) {
 
 export default function FeatureExtractorPanel({ podName }) {
   const { pumpAlerts, sensorReadings, metrics } = useAppState()
-  const m = metrics[podName] || {}
+  const m = findMetrics(metrics, podName)
 
   const alertsByPump = useMemo(() => {
     const map = {}

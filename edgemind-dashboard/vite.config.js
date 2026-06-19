@@ -6,9 +6,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:8080',
+      '/api': 'http://localhost:8090',
       '/ws': {
-        target: 'ws://localhost:8080',
+        target: 'ws://localhost:8090',
         ws: true,
       },
       // Sensor-sim ports for local dev (requires kubectl port-forward)
@@ -25,7 +25,7 @@ export default defineConfig({
         rewrite: path => path.replace(/^\/sensor3/, ''),
       },
       '/alertmanager': {
-        target: 'http://localhost:8005',
+        target: 'http://localhost:8006',
         rewrite: path => path.replace(/^\/alertmanager/, ''),
       },
     },

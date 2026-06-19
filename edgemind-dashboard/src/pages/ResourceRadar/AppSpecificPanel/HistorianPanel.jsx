@@ -1,11 +1,12 @@
 import { useAppState } from '../../../core/store/AppContext.jsx'
 import PvcGauge from '../../../components/ui/PvcGauge.jsx'
 import TrendSparkline from '../../../components/charts/TrendSparkline.jsx'
+import { findMetrics } from '../../../core/selectors/podHealth.js'
 
 export default function HistorianPanel({ podName }) {
   const { pvcs, metrics } = useAppState()
   const pvc1 = pvcs['historian-data'] || {}
-  const m = metrics[podName] || {}
+  const m = findMetrics(metrics, podName)
 
   const fsReadArr  = m.fs_read  || []
   const fsWriteArr = m.fs_write || []

@@ -1,5 +1,6 @@
 import { useAppState } from '../../../core/store/AppContext.jsx'
 import TrendSparkline from '../../../components/charts/TrendSparkline.jsx'
+import { findMetrics } from '../../../core/selectors/podHealth.js'
 
 const SENSOR_SIMS = [
   { id: 'sensor-sim-1', pump: 'pump1' },
@@ -9,7 +10,7 @@ const SENSOR_SIMS = [
 
 export default function CollectorPanel({ podName }) {
   const { metrics, sensorReadings } = useAppState()
-  const m = metrics[podName] || {}
+  const m = findMetrics(metrics, podName)
 
   const netRxArr = m.net_rx || []
   const netRx = netRxArr.length ? netRxArr[netRxArr.length - 1] : null
