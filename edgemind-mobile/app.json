@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "EdgeMind",
+    "slug": "edgemind-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ff000f"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.abb.edgemind"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ff000f"
+      },
+      "package": "com.abb.edgemind"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#ff000f"
+        }
+      ]
+    ],
+    "scheme": "edgemind",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
