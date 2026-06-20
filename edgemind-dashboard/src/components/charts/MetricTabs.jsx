@@ -25,12 +25,12 @@ function MetricSection({ title, children }) {
   )
 }
 
-export default function MetricTabs({ podName }) {
+export default function MetricTabs({ podName, isKubeSystem }) {
   const { metrics } = useAppState()
   const m = findMetrics(metrics, podName)
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: isKubeSystem ? 'repeat(4, 1fr)' : '1fr 1fr', gap: 12 }}>
       <MetricSection title="CPU">
         <RollingLineChart data={m.cpu_usage || []} color="var(--color-warning)" unit=" cores" label="Usage" height={56} />
         <RollingLineChart data={m.cpu_throttle || []} color="var(--color-warning-border)" unit="%" label="Throttle" height={42} anomalyThreshold={0.2} />
