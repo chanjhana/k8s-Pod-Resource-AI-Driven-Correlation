@@ -62,6 +62,7 @@ export default function GlobalHeader() {
 
   return (
     <header style={{
+      position: 'relative',
       height: 'var(--header-height)',
       flexShrink: 0,
       display: 'flex',
@@ -82,7 +83,10 @@ export default function GlobalHeader() {
       </div>
 
       {/* Nav */}
-      <nav style={{ display: 'flex', alignItems: 'stretch', height: '100%', gap: 0 }}>
+      <nav style={{ 
+        display: 'flex', alignItems: 'stretch', height: '100%', gap: 0,
+        position: 'absolute', left: '50%', transform: 'translateX(-50%)'
+      }}>
         {NAV.map(({ to, label }) => (
           <NavLink
             key={to}

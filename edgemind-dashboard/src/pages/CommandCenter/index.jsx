@@ -20,7 +20,7 @@ export default function CommandCenter() {
   const navigate = useNavigate()
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 1480 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Band 1 */}
       <KpiStrip />
 
@@ -42,7 +42,7 @@ export default function CommandCenter() {
           title="Click to open full Correlation Map"
         >
           <PanelHeader title="Anomaly Propagation Graph" hint="click to expand →" />
-          <div style={{ overflowX: 'auto', pointerEvents: 'none', marginTop: 8 }}>
+          <div style={{ overflowX: 'auto', pointerEvents: 'none', marginTop: 8, display: 'flex', justifyContent: 'center' }}>
             <PipelineGraph />
           </div>
         </div>

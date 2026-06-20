@@ -11,14 +11,14 @@ function fmtMinutes(min) {
   return `${h}h ${m}m`
 }
 
-function KpiCard({ label, value, sub, accent, isLast }) {
+function KpiCard({ label, value, sub, accent }) {
   return (
     <div style={{
       flex: '1 1 0', minWidth: 0,
-      padding: '8px 16px',
-      background: 'rgba(255,0,15,0.03)',
-      borderLeft: '3px solid var(--color-danger)',
-      borderRight: isLast ? 'none' : '1px solid rgba(255,0,15,0.15)',
+      padding: '12px 16px',
+      background: '#ffffff',
+      border: '1px solid #d1d5db',
+      borderRadius: 6,
       display: 'flex', flexDirection: 'column', gap: 4,
     }}>
       <div style={{
@@ -123,14 +123,10 @@ export default function KpiStrip() {
   return (
     <div style={{
       display: 'flex',
-      border: '1px solid rgba(255,0,15,0.35)',
-      borderTop: '3px solid var(--color-danger)',
-      borderRadius: 6,
-      overflow: 'hidden',
-      background: 'var(--color-bg-card)',
+      gap: 12,
     }}>
-      {cards.map((c, i) => (
-        <KpiCard key={c.label} {...c} isLast={i === cards.length - 1} />
+      {cards.map(c => (
+        <KpiCard key={c.label} {...c} />
       ))}
     </div>
   )
