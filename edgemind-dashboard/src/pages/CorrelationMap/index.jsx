@@ -32,7 +32,7 @@ export default function DependencyGraph() {
         scale={scale} onScaleChange={setScale}
       />
 
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column', padding: 16 }}>
         <GraphCanvas
           showPvcEdges={showPvcEdges}
           showMonitoring={showMonitoring}

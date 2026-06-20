@@ -19,7 +19,7 @@ export default function AnomalyTimeline() {
         paused={paused} setPaused={setPaused}
         panOffsetMs={panOffsetMs} setPanOffsetMs={setPanOffsetMs}
       />
-      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column', padding: 16 }}>
         <div style={{ minHeight: 420, flexShrink: 0 }}>
           <TimelineCanvas
             windowMs={windowMs} typeFilter={typeFilter}

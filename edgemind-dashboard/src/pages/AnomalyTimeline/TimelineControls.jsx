@@ -1,4 +1,4 @@
-﻿const EVENT_TYPES = [
+const EVENT_TYPES = [
   'cpu_spike', 'cpu_throttle', 'memory_leak', 'pre_oom', 'oomkill_detected',
   'io_saturation', 'write_burst', 'pvc_fill', 'network_flood', 'crash_loop',
   'log_error_surge', 'data_stale', 'pump_health_critical', 'correlated_alert',
@@ -29,9 +29,12 @@ export default function TimelineControls({
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px',
+      height: 'var(--header-height)',
       borderBottom: '1px solid var(--color-border-card)',
-      background: 'var(--color-bg-surface)', flexWrap: 'wrap',
+      marginTop: 12,
+      display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
+      background: 'var(--color-bg-card)', position: 'relative',
+      padding: '0 20px', flexWrap: 'wrap',
     }}>
       {/* Title + live indicator */}
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginRight: 2, flexShrink: 0 }}>

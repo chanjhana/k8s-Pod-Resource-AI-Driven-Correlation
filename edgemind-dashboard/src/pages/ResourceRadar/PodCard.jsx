@@ -1,4 +1,4 @@
-﻿import { useAppState } from '../../core/store/AppContext.jsx'
+import { useAppState } from '../../core/store/AppContext.jsx'
 import StatusDot from '../../components/ui/StatusDot.jsx'
 import MiniProgressBar from '../../components/ui/MiniProgressBar.jsx'
 import { INFO_ONLY_PODS, POD_NAMESPACES, POD_TO_PUMP } from '../../core/constants/pods.js'
@@ -64,6 +64,9 @@ export default function PodCard({ podName, onClick }) {
         background: 'var(--color-bg-card)',
         border: `1px solid ${borderColor}`,
         borderRadius: 6, padding: '10px 12px', cursor: 'pointer',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       {/* Name row */}

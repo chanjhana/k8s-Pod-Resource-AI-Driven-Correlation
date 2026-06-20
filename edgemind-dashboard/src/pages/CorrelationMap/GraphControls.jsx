@@ -1,4 +1,4 @@
-﻿import { useAppState } from '../../core/store/AppContext.jsx'
+import { useAppState } from '../../core/store/AppContext.jsx'
 import { useDispatch } from '../../core/store/AppContext.jsx'
 
 export default function GraphControls({
@@ -33,9 +33,12 @@ export default function GraphControls({
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px',
+      height: 'var(--header-height)',
       borderBottom: '1px solid var(--color-border-card)',
-      background: 'var(--color-bg-surface)', flexWrap: 'wrap',
+      marginTop: 12,
+      display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
+      background: 'var(--color-bg-card)', position: 'relative',
+      padding: '0 20px', flexWrap: 'wrap',
     }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
         <span style={{ display: 'inline-block', width: 3, height: 14, borderRadius: 2, background: 'var(--color-danger)', flexShrink: 0 }} />

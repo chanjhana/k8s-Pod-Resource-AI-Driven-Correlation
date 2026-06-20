@@ -1,4 +1,4 @@
-﻿import PvcFillRow from './PvcFillRow.jsx'
+import PvcFillRow from './PvcFillRow.jsx'
 import PodCard from './PodCard.jsx'
 import { PUMP_STATION_PODS, MONITORING_PODS } from '../../core/constants/pods.js'
 import PanelHeader from '../../components/ui/PanelHeader.jsx'
@@ -11,28 +11,29 @@ const NAMESPACE_GROUPS = [
   { ns: 'kube-system',  pods: KUBE_SYSTEM_PODS },
 ]
 
-export default function OverviewGrid({ onSelectPod, nsFilter = 'all' }) {
-  const groups = nsFilter === 'all'
-    ? NAMESPACE_GROUPS
-    : NAMESPACE_GROUPS.filter(g => g.ns === nsFilter)
-
-  const showPvcs = nsFilter === 'all' || nsFilter === 'pump-station'
+export default function OverviewGrid({ onSelectPod, nsFilter = 'pump-station' }) {
+  const groups = NAMESPACE_GROUPS.filter(g => g.ns === nsFilter)
 
   return (
     <div>
-      {showPvcs && <PvcFillRow />}
+      <PvcFillRow />
       {groups.map(({ ns, pods }) => (
         <div key={ns} style={{ marginBottom: 24 }}>
           <div style={{ paddingBottom: 6, marginBottom: 10, borderBottom: '1px solid var(--color-border-card)' }}>
             <PanelHeader title={ns} />
           </div>
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+            display: 'flex',
+            flexDirection: 'row',
+            flexWrap: 'nowrap',
             gap: 10,
+            width: '100%',
+            justifyContent: pods.length < 10 ? 'center' : 'flex-start',
           }}>
             {pods.map(pod => (
-              <PodCard key={pod} podName={pod} onClick={onSelectPod} />
+              <div key={pod} style={{ width: 'calc((100% - 90px) / 10)', flexShrink: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                <PodCard podName={pod} onClick={onSelectPod} />
+              </div>
             ))}
           </div>
         </div>

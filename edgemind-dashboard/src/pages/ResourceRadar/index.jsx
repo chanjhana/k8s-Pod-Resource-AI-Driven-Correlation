@@ -1,12 +1,11 @@
-﻿import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAppState } from '../../core/store/AppContext.jsx'
-import PodListSidebar from './PodListSidebar.jsx'
 import OverviewGrid from './OverviewGrid.jsx'
 import PodDetailView from './PodDetailView.jsx'
 import { PUMP_STATION_PODS, MONITORING_PODS } from '../../core/constants/pods.js'
 
-const NS_OPTIONS = ['all', 'pump-station', 'monitoring', 'kube-system']
+const NS_OPTIONS = ['pump-station', 'monitoring', 'kube-system']
 const ALL_TRACKED = [...PUMP_STATION_PODS, ...MONITORING_PODS]
 
 function useLastUpdatedSecs(metrics) {
@@ -31,8 +30,8 @@ function useLastUpdatedSecs(metrics) {
 
 export default function ResourceRadar() {
   const [searchParams] = useSearchParams()
-  const [selectedPod, setSelectedPod] = useState(searchParams.get('pod'))
-  const [nsFilter, setNsFilter] = useState('all')
+  const [selectedPod, setSelectedPod] = useState(searchParams.get('pod') || 'sensor-sim-1')
+  const [nsFilter, setNsFilter] = useState('pump-station')
   const { findings, metrics } = useAppState()
   const secsAgo = useLastUpdatedSecs(metrics)
 
@@ -53,41 +52,61 @@ export default function ResourceRadar() {
   }, [findings])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', overflow: 'hidden' }}>
 
       {/* ── Top bar ─────────────────────────────────────────────────── */}
       <div style={{
-        padding: '7px 16px', borderBottom: '1px solid var(--color-border-card)',
-        display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
-        background: 'var(--color-bg-card)', flexWrap: 'wrap',
+        height: 'var(--header-height)', 
+        borderBottom: '1px solid var(--color-border-card)',
+        marginTop: 12,
+        display: 'flex', alignItems: 'center', flexShrink: 0,
+        background: 'var(--color-bg-card)', position: 'relative',
+        padding: '0 20px',
       }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginRight: 4 }}>
+        {/* Title on the left */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginRight: 28 }}>
           <span style={{ display: 'inline-block', width: 3, height: 14, borderRadius: 2, background: 'var(--color-danger)', flexShrink: 0 }} />
           <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--color-text-primary)', textTransform: 'uppercase' }}>
             Pod Metrics &amp; Health
           </span>
-        </span>
+        </div>
 
-        {/* Namespace filter pills */}
-        <div style={{ display: 'flex', gap: 4 }}>
+        {/* Centered navigation-style namespace selector */}
+        <nav style={{
+          display: 'flex', alignItems: 'stretch', height: '100%', gap: 0,
+          position: 'absolute', left: '50%', transform: 'translateX(-50%)'
+        }}>
           {NS_OPTIONS.map(ns => (
-            <button
+            <div
               key={ns}
-              onClick={() => setNsFilter(ns)}
+              onClick={() => {
+                setNsFilter(ns)
+                if (ns === 'pump-station') setSelectedPod(PUMP_STATION_PODS[0])
+                else if (ns === 'monitoring') setSelectedPod(MONITORING_PODS[0])
+                else if (ns === 'kube-system') setSelectedPod('coredns')
+              }}
+              className={`nav-link-hover ${nsFilter === ns ? 'active' : ''}`}
               style={{
-                padding: '3px 10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
-                border: 'none', fontWeight: nsFilter === ns ? 700 : 400,
-                background: nsFilter === ns ? 'var(--color-info)' : 'var(--color-bg-surface)',
-                color: nsFilter === ns ? '#fff' : 'var(--color-text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 24px',
+                color: nsFilter === ns ? 'var(--color-danger)' : 'var(--color-text-primary)',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s',
               }}
             >
               {ns}
-            </button>
+            </div>
           ))}
-        </div>
+        </nav>
+
+        <div style={{ flex: 1 }} />
 
         {/* Health counts + last-updated */}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 14, alignItems: 'center', fontSize: 11 }}>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', fontSize: 11 }}>
           <span style={{ color: 'var(--color-success)' }}>✓ {healthCounts.running} Running</span>
           <span style={{ color: 'var(--color-warning)' }}>⚠ {healthCounts.warning} Warning</span>
           <span style={{ color: 'var(--color-danger)' }}>✗ {healthCounts.critical} Critical</span>
@@ -100,19 +119,14 @@ export default function ResourceRadar() {
       </div>
 
       {/* ── Body ────────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <PodListSidebar
-          selectedPod={selectedPod}
-          onSelectPod={setSelectedPod}
-          nsFilter={nsFilter}
-        />
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', width: '100%' }}>
+        <div style={{ flex: '0 0 auto', padding: '16px 16px 0 16px', borderBottom: '1px solid var(--color-border-card)' }}>
+          <OverviewGrid onSelectPod={setSelectedPod} nsFilter={nsFilter} />
+        </div>
+        
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          {selectedPod ? (
-            <PodDetailView podName={selectedPod} onBack={() => setSelectedPod(null)} />
-          ) : (
-            <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
-              <OverviewGrid onSelectPod={setSelectedPod} nsFilter={nsFilter} />
-            </div>
+          {selectedPod && (
+            <PodDetailView podName={selectedPod} />
           )}
         </div>
       </div>

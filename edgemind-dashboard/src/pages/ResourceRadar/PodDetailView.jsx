@@ -1,4 +1,4 @@
-﻿import CommonInfraPanel from './CommonInfraPanel.jsx'
+import CommonInfraPanel from './CommonInfraPanel.jsx'
 import AppSpecificPanel from './AppSpecificPanel/index.jsx'
 import PanelHeader from '../../components/ui/PanelHeader.jsx'
 import { POD_ROLES, POD_NAMESPACES, INFO_ONLY_PODS } from '../../core/constants/pods.js'
@@ -16,12 +16,6 @@ export default function PodDetailView({ podName, onBack }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--color-border-card)', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <button
-          onClick={onBack}
-          style={{ background: 'transparent', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', fontSize: 13, padding: '2px 4px' }}
-        >
-          ← Back
-        </button>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--color-text-primary)' }}>{podName}</span>

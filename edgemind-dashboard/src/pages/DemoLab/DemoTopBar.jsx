@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useAppState } from '../../core/store/AppContext.jsx'
 import { useFaultInjection } from '../../core/api/useFaultInjection.js'
 
@@ -39,11 +39,19 @@ export default function DemoTopBar() {
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px',
+      height: 'var(--header-height)',
       borderBottom: '1px solid var(--color-border-card)',
-      background: 'var(--color-bg-surface)', flexWrap: 'wrap',
+      marginTop: 12,
+      display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+      background: 'var(--color-bg-card)', position: 'relative',
+      padding: '0 20px', flexWrap: 'wrap',
     }}>
-      <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>Demo Lab</span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+        <span style={{ display: 'inline-block', width: 3, height: 14, borderRadius: 2, background: 'var(--color-danger)', flexShrink: 0 }} />
+        <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', color: 'var(--color-text-primary)', textTransform: 'uppercase' }}>
+          Fault Demo
+        </span>
+      </span>
 
       {/* System status indicator */}
       <span style={{
