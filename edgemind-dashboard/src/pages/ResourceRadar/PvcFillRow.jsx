@@ -8,7 +8,7 @@ export default function PvcFillRow() {
   const promPvc   = pvcs['prometheus-tsdb'] || {}
 
   return (
-    <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+    <div style={{ display: 'flex', gap: 12 }}>
       <PvcGauge
         pvcName="historian-data"
         used={historian.used}

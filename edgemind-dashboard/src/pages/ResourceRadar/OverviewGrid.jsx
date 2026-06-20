@@ -1,5 +1,6 @@
 import PvcFillRow from './PvcFillRow.jsx'
 import PodCard from './PodCard.jsx'
+import FaultInjectionControls from './FaultInjectionControls.jsx'
 import { PUMP_STATION_PODS, MONITORING_PODS } from '../../core/constants/pods.js'
 import PanelHeader from '../../components/ui/PanelHeader.jsx'
 
@@ -11,12 +12,17 @@ const NAMESPACE_GROUPS = [
   { ns: 'kube-system',  pods: KUBE_SYSTEM_PODS },
 ]
 
-export default function OverviewGrid({ onSelectPod, nsFilter = 'pump-station' }) {
+export default function OverviewGrid({ onSelectPod, nsFilter = 'pump-station', selectedPod }) {
   const groups = NAMESPACE_GROUPS.filter(g => g.ns === nsFilter)
 
   return (
     <div>
-      <PvcFillRow />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'stretch', marginBottom: 16, gap: 16 }}>
+        <PvcFillRow />
+        {selectedPod && selectedPod.startsWith('sensor-sim-') && (
+          <FaultInjectionControls selectedPod={selectedPod} />
+        )}
+      </div>
       {groups.map(({ ns, pods }) => (
         <div key={ns} style={{ marginBottom: 24 }}>
           <div style={{ paddingBottom: 6, marginBottom: 10, borderBottom: '1px solid var(--color-border-card)' }}>

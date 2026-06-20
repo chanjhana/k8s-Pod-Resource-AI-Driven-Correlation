@@ -33,8 +33,8 @@ export default function PodDetailView({ podName, onBack }) {
       <div style={{ flex: 1, overflow: 'auto', display: 'flex', gap: 0 }}>
         {!infoOnly && (
           <div style={{
-            width: 340, flexShrink: 0, borderRight: '1px solid var(--color-border-card)',
-            padding: 16, overflowY: 'auto',
+            flex: 1, borderRight: '1px solid var(--color-border-card)',
+            padding: 16, overflowY: 'auto', minWidth: 0,
           }}>
             <PanelHeader title="Infrastructure Metrics" style={{ marginBottom: 10 }} />
             <CommonInfraPanel podName={podName} />

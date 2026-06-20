@@ -19,6 +19,8 @@ export default function PvcGauge({ pvcName, used, capacity, fillPct, ttfMinutes,
       borderRadius: 6,
       padding: '10px 12px',
       minWidth: 140,
+      height: '100%',
+      boxSizing: 'border-box',
     }}
     className={pulse ? 'animate-pulse-border' : ''}
     >

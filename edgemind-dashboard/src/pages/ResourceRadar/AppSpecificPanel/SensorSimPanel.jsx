@@ -1,8 +1,6 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useAppState } from '../../../core/store/AppContext.jsx'
-import { useFaultInjection } from '../../../core/api/useFaultInjection.js'
 import { POD_TO_PUMP } from '../../../core/constants/pods.js'
-import { FAULT_MODES } from '../../../core/constants/faultModes.js'
 import IsoZoneBadge from '../../../components/ui/IsoZoneBadge.jsx'
 
 function ReadingRow({ label, value, unit, warn }) {
@@ -20,12 +18,8 @@ export default function SensorSimPanel({ podName }) {
   const { sensorReadings, demoLab } = useAppState()
   const pumpId = POD_TO_PUMP[podName] || 'pump1'
   const readings = sensorReadings[pumpId] || {}
-  const { inject, clear, loading, error } = useFaultInjection(pumpId)
 
-  const [mode, setMode] = useState('imbalance')
-  const [duration, setDuration] = useState(120)
   const activeFault = demoLab.activeFaults[pumpId]
-  const selectedMode = FAULT_MODES.find(f => f.id === mode)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -54,59 +48,6 @@ export default function SensorSimPanel({ podName }) {
           <span style={{ color: 'var(--color-danger)' }}>Active: {activeFault}</span>
         </div>
       )}
-
-      <div style={{ borderTop: '1px solid var(--color-border-card)', paddingTop: 10 }}>
-        <div style={{ fontSize: 10, color: 'var(--color-text-tertiary)', fontWeight: 700, marginBottom: 6 }}>INJECT FAULT</div>
-        <select value={mode} onChange={e => setMode(e.target.value)} style={{
-          width: '100%', marginBottom: 6,
-          background: 'var(--color-bg-input)', color: 'var(--color-text-primary)',
-          border: '1px solid var(--color-border-primary)', borderRadius: 4, padding: '4px 8px', fontSize: 12,
-        }}>
-          {FAULT_MODES.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
-        </select>
-        {!selectedMode?.sustained && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 12 }}>
-            <label style={{ color: 'var(--color-text-secondary)' }}>Duration (s):</label>
-            <input
-              type="number" value={duration} min={30} max={3600}
-              onChange={e => setDuration(Number(e.target.value))}
-              style={{
-                width: 70, background: 'var(--color-bg-input)', color: 'var(--color-text-primary)',
-                border: '1px solid var(--color-border-primary)', borderRadius: 4, padding: '3px 6px', fontSize: 12,
-              }}
-            />
-          </div>
-        )}
-        {selectedMode?.sustained && (
-          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 6 }}>Sustained — runs until cleared</div>
-        )}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => inject(mode, selectedMode?.sustained ? undefined : duration)}
-            disabled={loading || !!activeFault}
-            style={{
-              flex: 1, padding: '5px 0', borderRadius: 4, cursor: loading || activeFault ? 'not-allowed' : 'pointer',
-              background: 'var(--color-danger)', color: '#fff', border: 'none', fontSize: 12, fontWeight: 700,
-              opacity: loading || activeFault ? 0.5 : 1,
-            }}
-          >
-            ▶ Inject
-          </button>
-          <button
-            onClick={clear}
-            disabled={loading || !activeFault}
-            style={{
-              padding: '5px 12px', borderRadius: 4, cursor: loading || !activeFault ? 'not-allowed' : 'pointer',
-              background: 'transparent', color: 'var(--color-text-secondary)',
-              border: '1px solid var(--color-border-primary)', fontSize: 12,
-              opacity: loading || !activeFault ? 0.5 : 1,
-            }}
-          >
-            Clear
-          </button>
-        </div>
-        {error && <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 4 }}>{error}</div>}
-      </div>
     </div>
   )
 }

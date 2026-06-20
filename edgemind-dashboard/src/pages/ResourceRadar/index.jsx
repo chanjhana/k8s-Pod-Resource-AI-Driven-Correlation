@@ -121,7 +121,7 @@ export default function ResourceRadar() {
       {/* ── Body ────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', width: '100%' }}>
         <div style={{ flex: '0 0 auto', padding: '16px 16px 0 16px', borderBottom: '1px solid var(--color-border-card)' }}>
-          <OverviewGrid onSelectPod={setSelectedPod} nsFilter={nsFilter} />
+          <OverviewGrid onSelectPod={setSelectedPod} nsFilter={nsFilter} selectedPod={selectedPod} />
         </div>
         
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
