@@ -37,7 +37,7 @@ export function useGraphAPI(useMock = false) {
       return;
     }
     try {
-      const res = await fetch(`${API_CONFIG.baseUrl}/graph`, {
+      const res = await fetch(`${API_CONFIG.baseUrl}/api/graph`, {
         signal: AbortSignal.timeout(API_CONFIG.timeout),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

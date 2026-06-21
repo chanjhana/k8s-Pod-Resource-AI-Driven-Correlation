@@ -36,7 +36,7 @@ export default function ChatBubble({ message, isStreaming }: ChatBubbleProps) {
           if (block.type === 'link') {
             return (
               <View key={i} style={styles.linkBlock}>
-                <Text style={styles.linkText}>> {block.label}</Text>
+                <Text style={styles.linkText}>{'>'} {block.label}</Text>
               </View>
             );
           }

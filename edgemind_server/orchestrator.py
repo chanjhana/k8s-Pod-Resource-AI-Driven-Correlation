@@ -240,6 +240,7 @@ back to its origin, then provide your analysis."""
                     tool_choice="auto",
                     temperature=0.1,
                     max_completion_tokens=2000,
+                    parallel_tool_calls=False,
                 )
             except Exception as e:
                 log.error("LLM API error: %s", e)

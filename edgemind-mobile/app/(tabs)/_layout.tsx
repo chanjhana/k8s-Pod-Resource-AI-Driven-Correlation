@@ -16,15 +16,18 @@ function TabIcon({ label, focused, badgeCount = 0, danger = false }: {
       <View style={[styles.activeBar, focused && styles.activeBarOn]} />
 
       <View style={styles.labelWrapper}>
-        <Text style={[styles.label, focused && styles.labelActive, danger && styles.labelDanger]}>
+        <Text 
+          numberOfLines={1} 
+          style={[styles.label, focused && styles.labelActive, danger && styles.labelDanger]}
+        >
           {label}
         </Text>
-        {badgeCount > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
-          </View>
-        )}
       </View>
+      {badgeCount > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -48,6 +51,15 @@ export default function TabLayout() {
           paddingTop: 0,
         },
         tabBarShowLabel: false,
+        tabBarIconStyle: {
+          width: '100%',
+          height: '100%',
+        },
+        tabBarItemStyle: {
+          height: 58,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
       }}
     >
       <Tabs.Screen
@@ -113,26 +125,32 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     flex: 1,
     height: 58,
+    width: '100%',
+    paddingHorizontal: 1,
+    position: 'relative',
   },
   activeBar: {
-    width: '100%',
-    height: 2,
+    width: '80%',
+    height: 3,
     backgroundColor: 'transparent',
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
   },
   activeBarOn: {
     backgroundColor: Colors.abbRed,
   },
   labelWrapper: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
-    gap: 4,
+    justifyContent: 'center',
+    marginTop: 18,
+    width: '100%',
   },
   label: {
     fontSize: 9,
     fontWeight: '700',
     color: Colors.abbGray2,
-    letterSpacing: 0.8,
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
   labelActive: {
     color: Colors.abbWhite,
@@ -141,13 +159,18 @@ const styles = StyleSheet.create({
     color: Colors.danger,
   },
   badge: {
+    position: 'absolute',
+    top: 6,
+    right: 2,
     backgroundColor: Colors.danger,
     borderRadius: 8,
-    minWidth: 14,
-    height: 14,
+    minWidth: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 3.5,
+    borderWidth: 1.5,
+    borderColor: Colors.abbBlack,
   },
   badgeText: { color: '#fff', fontSize: 8, fontWeight: '700' },
   headerRight: {

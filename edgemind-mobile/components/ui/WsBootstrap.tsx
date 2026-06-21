@@ -8,8 +8,8 @@ import { useAlertsAPI } from '../../core/api/useAlerts';
 import { useSensorsAPI } from '../../core/api/useSensors';
 import { useGraphAPI }   from '../../core/api/useGraph';
 
-// Set to true to use mock data without a running server
-const USE_MOCK = true;
+// Set to false to use the running server
+const USE_MOCK = false;
 
 export default function WsBootstrap() {
   useWebSocket();

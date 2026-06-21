@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#ff000f"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.abb.edgemind"
@@ -36,6 +38,14 @@
     "scheme": "edgemind",
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "f6dd34af-7e16-40ce-9761-fc22331c0f9e"
+      }
     }
   }
 }

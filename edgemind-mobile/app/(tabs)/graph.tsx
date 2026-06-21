@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useGraph, useAlerts } from '../../core/store/AppContext';
+import { useGraph, useAlerts, useActiveAlert } from '../../core/store/AppContext';
 import DependencyGraph from '../../components/graph/DependencyGraph';
 import { Colors, Typography, Spacing, Radius } from '../../components/ui/tokens';
 import { GraphNode } from '../../core/store/AppContext';
@@ -12,12 +12,23 @@ import SeverityDot from '../../components/ui/SeverityDot';
 export default function GraphScreen() {
   const { nodes, edges } = useGraph();
   const alerts = useAlerts();
+  const activeAlert = useActiveAlert();
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
 
   // Find alert for selected node
   const nodeAlert = selectedNode
     ? alerts.find(a => a.pod_id === selectedNode.id)
     : null;
+
+  // Auto-select node when activeAlert changes (e.g. on View in Graph action)
+  useEffect(() => {
+    if (activeAlert) {
+      const node = nodes.find(n => n.id === activeAlert.pod_id);
+      if (node) {
+        setSelectedNode(node);
+      }
+    }
+  }, [activeAlert, nodes]);
 
   // Legend items
   const LEGEND = [

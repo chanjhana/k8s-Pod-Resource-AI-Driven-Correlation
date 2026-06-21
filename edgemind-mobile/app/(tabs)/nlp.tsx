@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, KeyboardAvoidingView,
   Platform, Pressable,
@@ -16,7 +16,7 @@ function newId() { return `msg-${++msgIdCounter}-${Date.now()}`; }
 export default function NLPScreen() {
   const chatHistory = useChatHistory();
   const isLoading   = useChatLoading();
-  const { dispatch } = useApp();
+  const { state: { pendingQuery }, dispatch } = useApp();
   const listRef = useRef<FlatList>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -85,6 +85,14 @@ export default function NLPScreen() {
   function handleClear() {
     dispatch({ type: 'CLEAR_CHAT' });
   }
+
+  useEffect(() => {
+    if (pendingQuery) {
+      // Clear pending query first so we don't trigger twice
+      dispatch({ type: 'SET_PENDING_QUERY', payload: null });
+      handleSend(pendingQuery);
+    }
+  }, [pendingQuery]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>

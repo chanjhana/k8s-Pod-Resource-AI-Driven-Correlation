@@ -43,6 +43,7 @@ import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from kubernetes import client as k8s_client, config as k8s_config
 
 from edgemind_server.correlation_filter import CorrelationFilter, CorrelatedSignalBundle
@@ -205,6 +206,60 @@ async def _broadcast_to_ws(message: Dict[str, Any]) -> None:
     _ws_clients.difference_update(dead)
 
 
+def _send_sms_if_configured(alert_data: Dict[str, Any]) -> None:
+    try:
+        alert_type = (alert_data.get("alert_type") or "alert").upper()
+        confidence = alert_data.get("confidence", 0.0)
+        conf_pct = int(confidence * 100)
+        insight = alert_data.get("insight") or "No insight provided."
+        recommendation = alert_data.get("recommendation") or "No recommendation."
+        root_cause = alert_data.get("root_cause_pod") or "unknown"
+
+        log.info("Twilio SMS check: starting for alert type '%s' (confidence: %d%%, root cause: %s)", alert_type, conf_pct, root_cause)
+        account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+        auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+        from_num = os.environ.get("TWILIO_FROM_NUMBER")
+        to_num = os.environ.get("TWILIO_TO_NUMBER")
+        
+        log.info("Twilio config check: SID=%s, Token=%s, From=%s, To=%s", 
+                 account_sid[:8] + "..." if account_sid else "None", 
+                 auth_token[:4] + "..." if auth_token else "None", 
+                 from_num, to_num)
+                 
+        if not (account_sid and auth_token and from_num and to_num):
+            log.info("Twilio SMS credentials not set or incomplete. Skipping SMS alert.")
+            return
+            
+        body = f"EdgeMind [{alert_type}] {conf_pct}% Conf\nInsight: {insight}\nRoot Cause: {root_cause}\nRec: {recommendation}"
+        
+        import base64
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+        
+        post_params = {
+            "To": to_num,
+            "Body": body
+        }
+        if from_num.startswith("MG"):
+            post_params["MessagingServiceSid"] = from_num
+        else:
+            post_params["From"] = from_num
+            
+        data = urllib.parse.urlencode(post_params).encode("utf-8")
+        
+        req = urllib.request.Request(url, data=data, method="POST")
+        auth_str = f"{account_sid}:{auth_token}"
+        auth_b64 = base64.b64encode(auth_str.encode("utf-8")).decode("utf-8")
+        req.add_header("Authorization", f"Basic {auth_b64}")
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+        
+        log.info("Sending request to Twilio API URL: %s", url)
+        with urllib.request.urlopen(req, timeout=10) as response:
+            log.info("Twilio SMS notification sent successfully. Status: %d", response.getcode())
+    except Exception as e:
+        log.error("Unhandled exception in _send_sms_if_configured: %s", e, exc_info=True)
+
+
+
 async def _on_correlated_bundle(bundle: CorrelatedSignalBundle) -> None:
     """Called by correlation filter when a trigger fires."""
     log.info("Orchestrator triggered: %s", bundle.trigger_reason)
@@ -225,6 +280,13 @@ async def _on_correlated_bundle(bundle: CorrelatedSignalBundle) -> None:
         log.info(
             "Analysis complete: root_cause=%s confidence=%.2f duration=%.1fs",
             result.root_cause_pod, result.confidence, result.analysis_duration_s,
+        )
+
+        # Trigger SMS notification if configured (run in thread pool to avoid blocking event loop)
+        loop.run_in_executor(
+            _executor,
+            _send_sms_if_configured,
+            result_dict,
         )
     except Exception as e:
         log.error("Orchestrator failed: %s", e, exc_info=True)
@@ -353,6 +415,32 @@ async def clear_alerts():
     if _correlation_filter:
         _correlation_filter.reset_cooldown()
     return JSONResponse({"cleared": True})
+
+class ChatRequest(BaseModel):
+    message: str
+    history: list = []
+
+@app.post("/api/chat")
+async def handle_chat(req: ChatRequest):
+    if not _orchestrator:
+        return JSONResponse({"response": "Orchestrator not initialized."}, status_code=503)
+    try:
+        loop = asyncio.get_running_loop()
+        metrics = await loop.run_in_executor(_executor, _scrape_metrics)
+        
+        response = await loop.run_in_executor(
+            _executor,
+            _orchestrator.answer_user_query,
+            req.message,
+            req.history,
+            list(_recent_findings),
+            list(_recent_alerts),
+            metrics
+        )
+        return JSONResponse({"response": response})
+    except Exception as e:
+        log.error("Chat handler failed: %s", e)
+        return JSONResponse({"response": f"Error calling Copilot: {str(e)}"}, status_code=500)
 
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────

@@ -4,8 +4,8 @@
  * For production: your deployed URL.
  */
 export const API_CONFIG = {
-  // ⚠️  Change this to your FastAPI server's LAN IP when running on a device
-  baseUrl: 'http://localhost:8000',
-  wsUrl:   'ws://localhost:8000/ws',
+  // Configured to point directly to VM public NodePort for physical mobile devices
+  baseUrl: 'http://98.70.57.128:30080',
+  wsUrl:   'ws://98.70.57.128:30080/ws',
   timeout: 10_000,
 };

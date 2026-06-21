@@ -58,6 +58,7 @@ export interface AppState {
   chatHistory: ChatMessage[];
   chatLoading: boolean;
   toastMessage: string | null;
+  pendingQuery: string | null;
 }
 
 // ── Actions ────────────────────────────────────────────────────────────────
@@ -74,7 +75,8 @@ type Action =
   | { type: 'UPDATE_LAST_CHAT_MSG'; payload: Partial<ChatMessage> }
   | { type: 'SET_CHAT_LOADING'; payload: boolean }
   | { type: 'CLEAR_CHAT' }
-  | { type: 'SET_TOAST'; payload: string | null };
+  | { type: 'SET_TOAST'; payload: string | null }
+  | { type: 'SET_PENDING_QUERY'; payload: string | null };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -131,6 +133,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, chatHistory: [] };
     case 'SET_TOAST':
       return { ...state, toastMessage: action.payload };
+    case 'SET_PENDING_QUERY':
+      return { ...state, pendingQuery: action.payload };
     default:
       return state;
   }
@@ -148,6 +152,7 @@ const initialState: AppState = {
   chatHistory: [],
   chatLoading: false,
   toastMessage: null,
+  pendingQuery: null,
 };
 
 const AppContext = createContext<{

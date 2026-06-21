@@ -36,7 +36,7 @@ Thumbs.db
 
 # ── Runtime artifacts (sensor sim exports, alert logs, parquet) ────────────────
 exports/
-alerts/
+/alerts/
 *.parquet
 
 # Node modules and dependencies
