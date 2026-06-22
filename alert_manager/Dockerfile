@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy service source
 COPY alert_manager/ alert_manager/
 
+ENV PYTHONPATH=/app
 WORKDIR /app/alert_manager
 
 ENV ALERTS_DIR=/data/alerts \

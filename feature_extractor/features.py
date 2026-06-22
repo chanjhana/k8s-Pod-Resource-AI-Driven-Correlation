@@ -27,11 +27,17 @@ from scipy import stats
 
 from common.contract import (
     F_AXIAL_DOMINANCE,
+    F_AXIAL_TREND,
     F_BEARING_HEALTH,
+    F_RADIAL_TREND,
     F_RPM_STABILITY,
+    F_RPM_TREND,
+    F_TANGENTIAL_TREND,
     F_TEMP_RATE,
+    F_TEMP_TREND,
     F_VIB_RMS_TREND,
     axial_baseline,
+    vib_rms_baseline,
 )
 
 # Minimum samples needed for a meaningful regression (cold-start guard).
@@ -62,9 +68,14 @@ def _slope(times_s: Sequence[float], values: Sequence[float]) -> float:
     return slope if np.isfinite(slope) else 0.0
 
 
-def bearing_health(mean_axial: float, axial_base: float, mean_temp: float, rpm_std: float) -> float:
-    """Edgenius-style bearing-health score (0-100). Higher is healthier."""
-    vibration_penalty = _clip01((mean_axial - axial_base) / axial_base) * 40.0
+def bearing_health(mean_vib_rms: float, vib_rms_base: float, mean_temp: float, rpm_std: float) -> float:
+    """Edgenius-style bearing-health score (0-100). Higher is healthier.
+
+    Uses overall vibration RMS (radial²+tangential²+axial²)^0.5 so that
+    imbalance (radial/tangential dominant) and bearing faults (axial dominant)
+    both register a penalty. axial_dominance_ratio still distinguishes them.
+    """
+    vibration_penalty = _clip01((mean_vib_rms - vib_rms_base) / vib_rms_base) * 40.0
     temp_penalty = _clip01((mean_temp - 60.0) / 20.0) * 30.0
     rpm_penalty = _clip01(rpm_std / 10.0) * 30.0
     return 100.0 - vibration_penalty - temp_penalty - rpm_penalty
@@ -104,10 +115,17 @@ def compute_features(
     denom = mean_radial + mean_tangential
     axial_dominance = mean_axial / denom if denom > 1e-9 else 0.0
 
+    mean_vib_rms = float(np.mean(vib_rms))
+
     return {
         F_VIB_RMS_TREND: _slope(times_s, vib_rms),
         F_AXIAL_DOMINANCE: axial_dominance,
         F_TEMP_RATE: _slope(times_s, temp),
         F_RPM_STABILITY: rpm_std,
-        F_BEARING_HEALTH: bearing_health(mean_axial, axial_baseline(pump_id), mean_temp, rpm_std),
+        F_BEARING_HEALTH: bearing_health(mean_vib_rms, vib_rms_baseline(pump_id), mean_temp, rpm_std),
+        F_RADIAL_TREND: _slope(times_s, r),
+        F_TANGENTIAL_TREND: _slope(times_s, t),
+        F_AXIAL_TREND: _slope(times_s, a),
+        F_TEMP_TREND: _slope(times_s, temp),
+        F_RPM_TREND: _slope(times_s, speed),
     }

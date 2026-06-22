@@ -1,31 +1,147 @@
 # EdgeMind — Multi-Agent AI for Pod Resource Correlation
-### Pump Station Condition Monitoring on ABB Edgenius (k3s)
+### Industrial Pump Station Condition Monitoring on ABB Edgenius (k3s/k3d)
 
-EdgeMind detects cross-service resource anomalies in a Kubernetes-based industrial pump station pipeline using 4 domain agents + 1 Claude AI orchestrator. It reads **only standard infrastructure metrics** (CPU, memory, network, filesystem, PVC) — zero modification to the monitored workload.
+EdgeMind is an **infra-only anomaly detection system** for Kubernetes-based industrial workloads. It runs 4 domain agents that read standard infrastructure metrics (CPU, memory, network, filesystem, PVC) from Prometheus — zero modification to the monitored workload, zero custom instrumentation.
 
----
-
-## Architecture Overview
-
-```
-sensor-sim-1 ──┐
-sensor-sim-2 ──┼──► opc-ua-collector ──► data-historian ──► feature-extractor ──► health-scorer ──► alert-manager
-sensor-sim-3 ──┘                                         └──► batch-sync ──► PVC-2
-```
-
-Three OPC-UA pump simulators feed a 9-pod pipeline. EdgeMind watches the whole stack from the outside using Prometheus metrics.
+When correlated faults occur across pods, EdgeMind publishes structured findings to Redis with evidence, baseline values, and ETAs. A Claude AI orchestrator layer (Phase 2) correlates findings across agents to surface root-cause chains.
 
 ---
 
-## Prerequisites
+## Architecture
 
-| Tool | Version | Purpose |
+```
+┌─────────────────────────── pump-station namespace ───────────────────────────┐
+│                                                                               │
+│  sensor-sim-1 ──┐                                                             │
+│  sensor-sim-2 ──┼──► opc-ua-collector ──► data-historian (InfluxDB)          │
+│  sensor-sim-3 ──┘         │                      │                            │
+│                            │              feature-extractor                   │
+│                            │                      │                            │
+│                            │              health-scorer ──► alert-manager     │
+│                            │                      │                            │
+│                            └──────────────► batch-sync ──► mock-upload        │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────── monitoring namespace ─────────────────────────────┐
+│                                                                               │
+│  Prometheus (node-exporter + kube-state-metrics)                              │
+│       │                                                                        │
+│       ▼                                                                        │
+│  edgemind-agents ──► Redis (edgemind:findings)                                │
+│    ├── CPU agent                                                               │
+│    ├── Memory agent                                                            │
+│    ├── Storage agent                                                           │
+│    └── Network + Log agent                                                    │
+│                                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+```
+
+Three OPC-UA pump simulators feed a 9-pod pipeline. EdgeMind watches the whole stack from the outside using Prometheus metrics — no sidecars, no SDK changes, no workload involvement.
+
+---
+
+## Pipeline Components
+
+| Component | Role | Tech |
 |---|---|---|
-| Docker Desktop | 4.x+ | Run sensor-sim containers |
-| Docker Compose | v2 (bundled) | Orchestrate 3 pump containers |
-| Python | 3.11+ | Run tests locally |
-| Git | any | Clone repo |
-| k3s | 1.29+ | Full pipeline deployment (later) |
+| **sensor-sim-1/2/3** | OPC-UA pump simulators with fault injection API | asyncua, FastAPI |
+| **opc-ua-collector** | Subscribes to OPC-UA, writes to InfluxDB | asyncua, influxdb-client |
+| **data-historian** | Time-series store | InfluxDB 2.x |
+| **feature-extractor** | Computes bearing health, vibration trend, temp rate | scipy, numpy |
+| **health-scorer** | Classifies pump state (HEALTHY/WARNING/CRITICAL) | pure Python |
+| **alert-manager** | Enriches alerts, deduplicates, writes JSONL to PVC-2 | FastAPI |
+| **batch-sync** | Bulk Parquet export to PVC-2, simulates cloud upload | pandas, pyarrow |
+| **mock-upload** | Simulated cloud upload endpoint | FastAPI |
+
+---
+
+## EdgeMind Detection Agents
+
+All agents read from **Prometheus only** — no direct connection to InfluxDB, no workload APIs.
+
+### CPU Agent
+Detects: `cpu_spike` · `cpu_throttle` · `cpu_contention`
+
+Z-score anomaly detection over a 75-sample rolling window. Requires 2 consecutive cycles above threshold before firing (suppresses single-scrape noise). Classifies as node-level contention when multiple pods spike simultaneously with low CPU idle ratio.
+
+### Memory Agent
+Detects: `memory_leak` · `pre_oom` · `oomkill` · `node_pressure` · `memory_step`
+
+Linear regression (scipy.stats.linregress) over a 20-sample window to compute RSS slope in MB/min. OOMKill classified by checking pre-restart working_set/limit ratio. PRE_OOM includes ETA projection at current growth rate.
+
+### Storage Agent
+Detects: `io_saturation` · `write_burst` · `pvc_fill` · `pvc_contention` · `restart_io`
+
+Z-score on write rate window for burst detection. Linear regression on PVC used_bytes for time-to-full forecast. PVC-to-pod mapping built from Kubernetes API, refreshed every 5 minutes (immediate on startup). Contention detected when ≥2 pods with high I/O share the same PVC.
+
+### Network + Log Agent
+Detects: `network_flood` · `packet_drop` · `dependency_confirm` · `log_error_surge` · `timeout_pattern` · `pump_health_crit` · `crash_loop` · `k8s_oomkill`
+
+P75 baseline for flood detection. Dependency confirmation by correlating TX spike on one pod with RX spike on another within a lag window. Parses health-scorer structured logs for pump-level fault signatures. Watches Kubernetes events for CrashLoopBackOff, OOMKilling, BackOff.
+
+---
+
+## Finding Schema
+
+Every finding published to Redis includes:
+
+```json
+{
+  "finding_id": "uuid",
+  "timestamp": "2026-06-13T15:54:44+00:00",
+  "agent": "cpu | memory | storage | network_log",
+  "anomaly_type": "cpu_spike",
+  "severity": "warning | critical | info",
+  "pod": "opc-ua-collector",
+  "namespace": "pump-station",
+  "current_value": 0.82,
+  "baseline_value": 0.05,
+  "deviation": "Z-score 4.2σ above 75-cycle baseline",
+  "evidence": ["...", "..."],
+  "affected_pods": [],
+  "pvc_name": null,
+  "eta_minutes": null
+}
+```
+
+---
+
+## Fault Scenarios (for demo)
+
+| ID | Fault | What gets detected |
+|---|---|---|
+| **IC1** | `bearing_fault` on pump2 → health-scorer writes → feature-extractor reads | CPU spike + memory leak on feature-extractor; InfluxDB bulk read contention |
+| **IC2** | `flood` on pump2 → opc-ua-collector overwhelmed → alert-manager + batch-sync compete on PVC-2 | Network flood, write burst, PVC contention |
+| **IC3** | `flood` + fault export → batch-sync 500MB–1GB write | Storage I/O saturation, PVC fill TTF forecast |
+
+Fault injection via HTTP API on each sensor-sim container:
+```bash
+# Inject bearing fault on pump 2
+kubectl exec -n pump-station \
+  $(kubectl get pod -n pump-station -l app=sensor-sim-2 -o jsonpath='{.items[0].metadata.name}') \
+  -- curl -s -X POST http://localhost:8081/inject \
+  -H 'Content-Type: application/json' \
+  -d '{"mode":"bearing_fault","duration_s":300}'
+```
+
+---
+
+## Test Coverage
+
+```
+pytest edgemind_agents/tests/test_agents.py -v
+# 23 tests — CPU (6), Memory (4), Storage (6), Network/Log (6), Schema (1)
+# All agents mocked — no cluster required to run tests
+```
+
+```
+pytest sensor_sim/tests/ -v          # 45 tests — fault engine, OPC-UA server, inject API
+pytest feature_extractor/tests/ -v   # feature math
+pytest health_scorer/tests/ -v       # scoring logic
+pytest alert_manager/tests/ -v       # enrichment + dedup
+pytest batch_sync/tests/ -v          # export state, parquet round-trip
+```
 
 ---
 
@@ -33,196 +149,41 @@ Three OPC-UA pump simulators feed a 9-pod pipeline. EdgeMind watches the whole s
 
 ```
 k8s-Pod-Resource-AI-Driven-Correlation/
-├── sensor_sim/                  ← Pump sensor simulation (complete)
-│   ├── pump_config.py           ← Single source of truth: baselines, faults, OPC-UA layout
-│   ├── fault_engine.py          ← Pure-math fault engine (FaultState, compute_reading)
-│   ├── opc_server.py            ← asyncua OPC-UA server + emit loop
-│   ├── inject_server.py         ← FastAPI fault injection HTTP API
-│   ├── main.py                  ← Wiring layer (asyncio.gather)
-│   ├── Dockerfile               ← Single image, env-driven per pump
-│   ├── docker-compose.yml       ← 3 services: sensor-sim-1/2/3
-│   ├── requirements.txt
+├── k8s/                         ← Kubernetes manifests
+│   ├── namespaces.yaml
+│   ├── pump-station/            ← 10 service manifests + PVC/secrets/quota
+│   └── monitoring/              ← Redis, edgemind-agents, RBAC
+├── edgemind_agents/             ← EdgeMind detection agents (Layer 1)
+│   ├── agents/                  ← cpu, memory, storage, network_log, base
+│   ├── anomaly_types.py
+│   ├── models.py
 │   └── tests/
-│       ├── test_faults.py       ← Person A: pure math tests (12)
-│       ├── test_server.py       ← Person B: OPC-UA server tests (25)
-│       ├── test_inject.py       ← Person C: inject API tests (8)
-│       └── test_inject.sh       ← Integration smoke test (containers must be running)
-└── README.md
+├── sensor_sim/                  ← OPC-UA pump simulators (Layer 0)
+├── opc_ua_collector/            ← OPC-UA → InfluxDB
+├── feature_extractor/           ← InfluxDB → pump features
+├── health_scorer/               ← features → pump health state
+├── alert_manager/               ← health state → enriched alerts
+├── batch_sync/                  ← fault-triggered Parquet export
+├── mock_upload/                 ← simulated cloud upload endpoint
+├── common/                      ← shared contract (schema, constants)
+├── deploy.sh                    ← one-command cluster deploy
+└── SETUP.md                     ← deployment and operations guide
 ```
 
 ---
 
-## Setup
+## Project Status
 
-### 1. Clone the repository
-
-```bash
-git clone git@github.com:chanjhana/k8s-Pod-Resource-AI-Driven-Correlation.git
-cd k8s-Pod-Resource-AI-Driven-Correlation
-```
-
-### 2. Install Python dependencies (for local tests)
-
-```bash
-cd sensor_sim
-pip install -r requirements.txt
-```
-
-### 3. Run the test suite (no Docker needed)
-
-```bash
-cd sensor_sim
-python -m pytest -v
-# Expected: 45 passed
-```
-
----
-
-## Running the Sensor Simulators
-
-All commands run from `sensor_sim/`.
-
-### Start all three pump containers
-
-```bash
-docker compose up --build -d
-```
-
-This builds one image and starts three containers:
-
-| Container | Pump | OPC-UA Port | HTTP Port |
-|---|---|---|---|
-| sensor-sim-1 | Pump 1 (Primary, 75 kW) | 4840 | 8080 |
-| sensor-sim-2 | Pump 2 (Secondary, 45 kW) | 4841 | 8081 |
-| sensor-sim-3 | Pump 3 (Dosing, 7.5 kW) | 4842 | 8082 |
-
-### Check containers are healthy
-
-```bash
-docker compose ps
-```
-
-### View live logs
-
-```bash
-docker compose logs -f sensor-sim-2
-```
-
-### Stop all containers
-
-```bash
-docker compose down
-```
-
----
-
-## Inject API
-
-Each container exposes an HTTP API for fault injection.
-
-### Check status (live sensor readings)
-
-```bash
-# Bash
-curl http://localhost:8081/status
-
-# PowerShell
-curl.exe http://localhost:8081/status
-```
-
-### Inject a fault
-
-```bash
-# Bash
-curl -X POST http://localhost:8081/inject \
-  -H "Content-Type: application/json" \
-  -d '{"mode":"bearing_fault","duration_s":300}'
-
-# PowerShell
-curl.exe -X POST http://localhost:8081/inject -H "Content-Type: application/json" -d '{\"mode\":\"bearing_fault\",\"duration_s\":300}'
-```
-
-### Clear active fault
-
-```bash
-# Bash
-curl -X POST http://localhost:8081/inject \
-  -H "Content-Type: application/json" \
-  -d '{"mode":"clear"}'
-
-# PowerShell
-curl.exe -X POST http://localhost:8081/inject -H "Content-Type: application/json" -d '{\"mode\":\"clear\"}'
-```
-
-### Discover available modes
-
-```bash
-curl http://localhost:8081/modes
-```
-
-### Available fault modes
-
-| Mode | Pump | Effect |
+| Layer | Component | Status |
 |---|---|---|
-| `bearing_fault` | Pump 2 | Axial vibration drifts 0.8 → 4.8 mm/s over 5 min |
-| `cavitation` | Pump 2 | Radial + tangential spike to 5.2 mm/s immediately |
-| `flood` | Pump 2 | Emission rate jumps to 10 Hz (values stay normal) |
-| `imbalance` | Pump 1 | Radial + tangential drift together over 4 min |
-| `seal_leak` | Pump 1 | Temperature rises sharply over 6 min |
-| `overheat` | Pump 3 | Temperature drifts 42 → 79 °C over 5 min |
-| `sensor_noise` | Any | Occasional random spikes on all parameters |
-| `clear` | Any | Cancel active fault, return to normal |
-
-### Combined scenario (two containers at once)
-
-```bash
-# Bash — flood on pump2 + overheat on pump3 simultaneously
-curl -X POST http://localhost:8081/inject -H "Content-Type: application/json" -d '{"mode":"flood"}'
-curl -X POST http://localhost:8082/inject -H "Content-Type: application/json" -d '{"mode":"overheat","duration_s":300}'
-```
-
----
-
-## Integration Smoke Test (containers must be running)
-
-```bash
-bash tests/test_inject.sh
-# Expected: 4 passed, 0 failed
-```
-
----
-
-## Watch a Fault Live
-
-Open two terminals.
-
-**Terminal 1 — watch values update:**
-```bash
-# Bash
-watch -n 1 "curl -s http://localhost:8081/status"
-```
-
-**Terminal 2 — inject the fault:**
-```bash
-curl -X POST http://localhost:8081/inject \
-  -H "Content-Type: application/json" \
-  -d '{"mode":"bearing_fault","duration_s":300}'
-```
-
-Watch `vibration_axial` climb from ~0.8 toward 4.8 mm/s over 5 minutes. Inject `clear` to reset.
-
----
-
-## What's Next
-
-| Layer | Status |
-|---|---|
-| sensor-sim (3 pumps, OPC-UA + inject API) | ✅ Complete |
-| opc-ua-collector (subscribes to OPC-UA, writes to InfluxDB) | 🔲 Next |
-| data-historian (InfluxDB 2.x) | 🔲 Next |
-| feature-extractor | 🔲 Next |
-| health-scorer | 🔲 Next |
-| alert-manager | 🔲 Next |
-| batch-sync | 🔲 Next |
-| EdgeMind agents + orchestrator | 🔲 Next |
-| Dashboard | 🔲 Next |
+| **Layer 0** | sensor-sim (3 pumps, OPC-UA + fault inject API) | ✅ Complete |
+| **Layer 0** | opc-ua-collector (OPC-UA → InfluxDB) | ✅ Complete |
+| **Layer 0** | data-historian (InfluxDB 2.x) | ✅ Running |
+| **Layer 0** | feature-extractor | ✅ Complete |
+| **Layer 0** | health-scorer | ✅ Complete |
+| **Layer 0** | alert-manager | ✅ Complete |
+| **Layer 0** | batch-sync + mock-upload | ✅ Complete |
+| **Layer 1** | EdgeMind agents (4 agents, 23 finding types) | ✅ Complete |
+| **Layer 1** | Finding schema (evidence, baseline, deviation, ETA) | ✅ Complete |
+| **Layer 2** | Claude AI orchestrator (cross-agent correlation) | 🔲 Phase 2 |
+| **Layer 2** | Dashboard / server | 🔲 Phase 2 |

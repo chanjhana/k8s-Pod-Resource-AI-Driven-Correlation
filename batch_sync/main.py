@@ -380,7 +380,7 @@ async def _run_fault_export(
         (df_health,    "pump_health"),
     ]:
         if not df.empty:
-            df.insert(0, "_measurement", meas)
+            df["_measurement"] = meas
 
     # Concatenate into one export DataFrame.
     frames = [df for df in [df_telemetry, df_features, df_health] if not df.empty]

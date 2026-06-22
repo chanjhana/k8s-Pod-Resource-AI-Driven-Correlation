@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY batch_sync/ batch_sync/
 
 # Run from /app so `from common.contract import ...` resolves correctly.
+ENV PYTHONPATH=/app
 WORKDIR /app/batch_sync
 
 ENV INFLUX_URL=http://data-historian:8086 \
