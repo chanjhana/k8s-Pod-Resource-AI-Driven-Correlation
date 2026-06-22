@@ -7,7 +7,7 @@ import { Colors, Typography, severityColor } from '../ui/tokens';
 import { GraphNode, GraphEdge } from '../../core/store/AppContext';
 
 const { width: SW, height: SH } = Dimensions.get('window');
-const CANVAS_W = SW;
+const CANVAS_W = 920; // Expanded to fit all nodes (up to mock-upload at x=760)
 const CANVAS_H = SH * 0.65;
 
 // Fixed layout positions for the pump station pipeline
@@ -63,7 +63,7 @@ export default function DependencyGraph({ nodes, edges, onNodePress }: Dependenc
       {...panResponder.panHandlers}
       style={[styles.canvas, { transform: [{ translateX: offsetX }, { translateY: offsetY }] }]}
     >
-      <Svg width={CANVAS_W + 200} height={CANVAS_H}>
+      <Svg width={CANVAS_W} height={CANVAS_H}>
         {/* Edges */}
         {edges.map((edge, i) => {
           const src = FIXED_POSITIONS[edge.source];
