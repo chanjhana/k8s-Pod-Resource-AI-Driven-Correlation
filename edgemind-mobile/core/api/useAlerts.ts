@@ -51,24 +51,78 @@ const MOCK_ALERTS = [
   },
 ];
 
+const MOCK_DMD_FORECASTS = [
+  {
+    finding_id: 'dmd-001',
+    anomaly_type: 'dmd_cpu_forecast',
+    severity: 'WARNING',
+    pod: 'sensor-sim-2-76b9fcd-pnvrk',
+    container: 'sensor-sim-2',
+    metric_label: 'CPU Usage',
+    predicted_breach_seconds: 45,
+    predicted_value_at_breach: 0.92,
+    deviation: 'CPU Usage predicted to reach 92.0% of limit in 45s',
+    dominant_growth_rate_per_sec: 0.0024,
+    evidence: [
+      'DMD forecast: CPU Usage currently at 65.0% of limit',
+      'Predicted to reach 92.0% in 45s (3 steps of 15s)',
+      'DMD model fitted on 30 snapshots',
+    ],
+    timestamp: new Date().toISOString(),
+    is_dmd: true,
+  },
+  {
+    finding_id: 'dmd-002',
+    anomaly_type: 'dmd_mem_forecast',
+    severity: 'WARNING',
+    pod: 'batch-sync-68df8b8b-8qqns',
+    container: 'batch-sync',
+    metric_label: 'Memory RSS',
+    predicted_breach_seconds: 60,
+    predicted_value_at_breach: 0.88,
+    deviation: 'Memory RSS predicted to reach 88.0% of limit in 60s',
+    dominant_growth_rate_per_sec: 0.0018,
+    evidence: [
+      'DMD forecast: Memory RSS currently at 72.0% of limit',
+      'Predicted to reach 88.0% in 60s (4 steps of 15s)',
+      'DMD model fitted on 30 snapshots',
+    ],
+    timestamp: new Date().toISOString(),
+    is_dmd: true,
+  }
+];
+
 export function useAlertsAPI(useMock = false) {
   const { dispatch } = useApp();
 
   const fetchAlerts = useCallback(async () => {
     if (useMock) {
       dispatch({ type: 'SET_ALERTS', payload: MOCK_ALERTS });
+      dispatch({ type: 'SET_DMD_FORECASTS', payload: MOCK_DMD_FORECASTS });
       return;
     }
     try {
-      const res = await fetch(`${API_CONFIG.baseUrl}/api/alerts`, {
+      // 1. Fetch Correlated Alerts
+      const resAlerts = await fetch(`${API_CONFIG.baseUrl}/api/alerts`, {
         signal: AbortSignal.timeout(API_CONFIG.timeout),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      dispatch({ type: 'SET_ALERTS', payload: Array.isArray(data) ? data : data.alerts ?? [] });
+      if (resAlerts.ok) {
+        const data = await resAlerts.json();
+        dispatch({ type: 'SET_ALERTS', payload: Array.isArray(data) ? data : data.alerts ?? [] });
+      }
+
+      // 2. Fetch DMD Early Warning Forecasts
+      const resDmd = await fetch(`${API_CONFIG.baseUrl}/api/dmd-forecasts`, {
+        signal: AbortSignal.timeout(API_CONFIG.timeout),
+      });
+      if (resDmd.ok) {
+        const data = await resDmd.json();
+        dispatch({ type: 'SET_DMD_FORECASTS', payload: data.dmd_findings ?? [] });
+      }
     } catch (err) {
       console.warn('[useAlertsAPI] Falling back to mock data:', err);
       dispatch({ type: 'SET_ALERTS', payload: MOCK_ALERTS });
+      dispatch({ type: 'SET_DMD_FORECASTS', payload: MOCK_DMD_FORECASTS });
     }
   }, [dispatch, useMock]);
 

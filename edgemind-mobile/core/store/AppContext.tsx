@@ -59,6 +59,7 @@ export interface AppState {
   chatLoading: boolean;
   toastMessage: string | null;
   pendingQuery: string | null;
+  dmdForecasts: any[];
 }
 
 // ── Actions ────────────────────────────────────────────────────────────────
@@ -76,7 +77,9 @@ type Action =
   | { type: 'SET_CHAT_LOADING'; payload: boolean }
   | { type: 'CLEAR_CHAT' }
   | { type: 'SET_TOAST'; payload: string | null }
-  | { type: 'SET_PENDING_QUERY'; payload: string | null };
+  | { type: 'SET_PENDING_QUERY'; payload: string | null }
+  | { type: 'SET_DMD_FORECASTS'; payload: any[] }
+  | { type: 'ADD_DMD_FORECAST'; payload: any };
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -135,6 +138,15 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, toastMessage: action.payload };
     case 'SET_PENDING_QUERY':
       return { ...state, pendingQuery: action.payload };
+    case 'SET_DMD_FORECASTS':
+      return { ...state, dmdForecasts: action.payload };
+    case 'ADD_DMD_FORECAST': {
+      const exists = state.dmdForecasts.find(f => f.finding_id === action.payload.finding_id);
+      const dmdForecasts = exists
+        ? state.dmdForecasts.map(f => f.finding_id === action.payload.finding_id ? action.payload : f)
+        : [action.payload, ...state.dmdForecasts];
+      return { ...state, dmdForecasts: dmdForecasts.slice(0, 50) };
+    }
     default:
       return state;
   }
@@ -153,6 +165,7 @@ const initialState: AppState = {
   chatLoading: false,
   toastMessage: null,
   pendingQuery: null,
+  dmdForecasts: [],
 };
 
 const AppContext = createContext<{
@@ -183,3 +196,4 @@ export function useWsConnected()  { return useApp().state.wsConnected; }
 export function useChatHistory()  { return useApp().state.chatHistory; }
 export function useChatLoading()  { return useApp().state.chatLoading; }
 export function useToast()        { return useApp().state.toastMessage; }
+export function useDmdForecasts() { return useApp().state.dmdForecasts; }

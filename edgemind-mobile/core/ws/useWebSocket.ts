@@ -104,6 +104,29 @@ export function useWebSocket() {
         dispatch({ type: 'SET_GRAPH', payload: { nodes: data.nodes || [], edges: data.edges || [] } });
         break;
       }
+      case 'agent_finding': {
+        const finding = data.data || data.payload || data;
+        if (finding && finding.is_dmd) {
+          dispatch({ type: 'ADD_DMD_FORECAST', payload: finding });
+          
+          if (finding.severity === 'CRITICAL' || finding.severity === 'WARNING') {
+            scheduleAlertNotification({
+              id: finding.finding_id || `dmd-${Date.now()}`,
+              pod_id: finding.pod || finding.container,
+              severity: finding.severity,
+              title: `DMD Early Warning: ${finding.metric_label || 'Resource Breach'}`,
+              description: finding.deviation || 'A resource limit breach is predicted soon.',
+              timestamp: finding.timestamp || new Date().toISOString(),
+            });
+            dispatch({
+              type: 'SET_TOAST',
+              payload: `DMD WARNING: ${finding.deviation}`,
+            });
+            setTimeout(() => dispatch({ type: 'SET_TOAST', payload: null }), 5000);
+          }
+        }
+        break;
+      }
       default:
         break;
     }

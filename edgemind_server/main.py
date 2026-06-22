@@ -70,6 +70,7 @@ HEARTBEAT_BROADCAST_INTERVAL = int(os.environ.get("HEARTBEAT_BROADCAST_INTERVAL"
 _recent_alerts: deque = deque(maxlen=50)
 _recent_findings: deque = deque(maxlen=200)
 _ws_clients: Set[WebSocket] = set()
+_last_metrics: Optional[Dict[str, Any]] = None
 
 app = FastAPI(title="EdgeMind Server", version="1.0.0")
 app.add_middleware(
@@ -204,35 +205,43 @@ async def _broadcast_to_ws(message: Dict[str, Any]) -> None:
         except Exception:
             dead.add(ws)
     _ws_clients.difference_update(dead)
-
-
 def _send_sms_if_configured(alert_data: Dict[str, Any]) -> None:
     try:
-        alert_type = (alert_data.get("alert_type") or "alert").upper()
-        confidence = alert_data.get("confidence", 0.0)
-        conf_pct = int(confidence * 100)
-        insight = alert_data.get("insight") or "No insight provided."
-        recommendation = alert_data.get("recommendation") or "No recommendation."
-        root_cause = alert_data.get("root_cause_pod") or "unknown"
-
-        log.info("Twilio SMS check: starting for alert type '%s' (confidence: %d%%, root cause: %s)", alert_type, conf_pct, root_cause)
+        is_dmd = alert_data.get("is_dmd") is True
+        
         account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
         auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
         from_num = os.environ.get("TWILIO_FROM_NUMBER")
         to_num = os.environ.get("TWILIO_TO_NUMBER")
         
-        log.info("Twilio config check: SID=%s, Token=%s, From=%s, To=%s", 
+        log.info("Twilio SMS check: starting. SID=%s, From=%s, To=%s", 
                  account_sid[:8] + "..." if account_sid else "None", 
-                 auth_token[:4] + "..." if auth_token else "None", 
                  from_num, to_num)
                  
         if not (account_sid and auth_token and from_num and to_num):
             log.info("Twilio SMS credentials not set or incomplete. Skipping SMS alert.")
             return
+
+        if is_dmd:
+            anomaly_type = (alert_data.get("anomaly_type") or "dmd_warning").upper()
+            pod = alert_data.get("pod") or alert_data.get("container") or "unknown"
+            deviation = alert_data.get("deviation") or "Threshold breach predicted."
+            growth_rate = alert_data.get("dominant_growth_rate_per_sec", 0.0)
             
-        body = f"EdgeMind [{alert_type}] {conf_pct}% Conf\nInsight: {insight}\nRoot Cause: {root_cause}\nRec: {recommendation}"
+            body = f"EdgeMind [DMD EARLY WARNING]\nType: {anomaly_type}\nPod: {pod}\nWarning: {deviation}\nGrowth: {growth_rate:.4f}/s"
+        else:
+            alert_type = (alert_data.get("alert_type") or "alert").upper()
+            confidence = alert_data.get("confidence", 0.0)
+            conf_pct = int(confidence * 100)
+            insight = alert_data.get("insight") or "No insight provided."
+            recommendation = alert_data.get("recommendation") or "No recommendation."
+            root_cause = alert_data.get("root_cause_pod") or "unknown"
+            
+            body = f"EdgeMind [{alert_type}] {conf_pct}% Conf\nInsight: {insight}\nRoot Cause: {root_cause}\nRec: {recommendation}"
         
         import base64
+        import urllib.request
+        import urllib.parse
         url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
         
         post_params = {
@@ -259,7 +268,6 @@ def _send_sms_if_configured(alert_data: Dict[str, Any]) -> None:
         log.error("Unhandled exception in _send_sms_if_configured: %s", e, exc_info=True)
 
 
-
 async def _on_correlated_bundle(bundle: CorrelatedSignalBundle) -> None:
     """Called by correlation filter when a trigger fires."""
     log.info("Orchestrator triggered: %s", bundle.trigger_reason)
@@ -281,7 +289,7 @@ async def _on_correlated_bundle(bundle: CorrelatedSignalBundle) -> None:
             "Analysis complete: root_cause=%s confidence=%.2f duration=%.1fs",
             result.root_cause_pod, result.confidence, result.analysis_duration_s,
         )
-
+        
         # Trigger SMS notification if configured (run in thread pool to avoid blocking event loop)
         loop.run_in_executor(
             _executor,
@@ -314,6 +322,15 @@ async def _finding_relay_loop() -> None:
                     _relayed_ids.add(fid)
                     _recent_findings.appendleft(finding)
                     await _broadcast_to_ws({"type": "agent_finding", "data": finding})
+                    
+                    # If this is a DMD early warning finding, trigger SMS!
+                    if finding.get("is_dmd") is True:
+                        loop = asyncio.get_running_loop()
+                        loop.run_in_executor(
+                            _executor,
+                            _send_sms_if_configured,
+                            finding,
+                        )
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -323,11 +340,13 @@ async def _finding_relay_loop() -> None:
 
 async def _metric_broadcast_loop() -> None:
     """Scrape Prometheus every METRIC_BROADCAST_INTERVAL s and broadcast metric_update."""
+    global _last_metrics
     loop = asyncio.get_running_loop()
     while True:
         await asyncio.sleep(METRIC_BROADCAST_INTERVAL)
         try:
             snapshot = await loop.run_in_executor(_executor, _scrape_metrics)
+            _last_metrics = snapshot
             await _broadcast_to_ws({"type": "metric_update", "data": snapshot})
         except asyncio.CancelledError:
             raise
@@ -337,7 +356,7 @@ async def _metric_broadcast_loop() -> None:
 
 async def _heartbeat_broadcast_loop() -> None:
     """Poll Redis heartbeat keys and broadcast agent_heartbeat events."""
-    agents = ["cpu", "memory", "storage", "network_log"]
+    agents = ["cpu", "memory", "storage", "network_log", "dmd"]
     while True:
         await asyncio.sleep(HEARTBEAT_BROADCAST_INTERVAL)
         try:
@@ -397,8 +416,8 @@ async def get_metrics():
 
 @app.get("/api/agent-status")
 async def get_agent_status():
-    """Check heartbeats of all 4 agents."""
-    agents = ["cpu", "memory", "storage", "network_log"]
+    """Check heartbeats of all 4 core agents + DMD early-warning agent."""
+    agents = ["cpu", "memory", "storage", "network_log", "dmd"]
     status = {}
     for agent in agents:
         key = f"edgemind:heartbeat:{agent}"
@@ -409,11 +428,21 @@ async def get_agent_status():
         }
     return JSONResponse(status)
 
+@app.get("/api/dmd-forecasts")
+async def get_dmd_forecasts(limit: int = 20):
+    """Return latest DMD early-warning findings (is_dmd=True) for initial page load."""
+    dmd_findings = [
+        f for f in list(_recent_findings)
+        if f.get("is_dmd") is True
+    ][:limit]
+    return JSONResponse({"dmd_findings": dmd_findings, "count": len(dmd_findings)})
+
 @app.delete("/api/alerts")
 async def clear_alerts():
     _recent_alerts.clear()
     if _correlation_filter:
         _correlation_filter.reset_cooldown()
+    await _broadcast_to_ws({"type": "alerts_cleared"})
     return JSONResponse({"cleared": True})
 
 class ChatRequest(BaseModel):
@@ -458,10 +487,11 @@ async def websocket_endpoint(ws: WebSocket):
                 "recent_findings": list(_recent_findings)[:20],
                 "recent_alerts": [_normalize_alert(a) for a in list(_recent_alerts)[:5]],
                 "dependency_graph": _graph.to_json() if _graph else {},
+                "metrics": _last_metrics,
             }
         }, default=str))
         # Emit current heartbeats immediately so dashboard doesn't wait 30s
-        for agent in ["cpu", "memory", "storage", "network_log"]:
+        for agent in ["cpu", "memory", "storage", "network_log", "dmd"]:
             val = await _redis.get(f"edgemind:heartbeat:{agent}")
             if val:
                 await ws.send_text(json.dumps({
@@ -484,9 +514,18 @@ async def websocket_endpoint(ws: WebSocket):
 async def startup():
     global _redis, _graph, _orchestrator
 
-    # Redis
+    # Redis — retry on startup to tolerate CoreDNS not yet ready
     _redis = aioredis.from_url(REDIS_URL, decode_responses=True)
-    await _redis.ping()
+    for _attempt in range(10):
+        try:
+            await _redis.ping()
+            break
+        except Exception as _e:
+            if _attempt == 9:
+                raise
+            _wait = min(2 ** _attempt, 30)
+            log.warning("Redis not ready (attempt %d/10), retrying in %ds: %s", _attempt + 1, _wait, _e)
+            await asyncio.sleep(_wait)
     log.info("Redis connected")
 
     # Kubernetes

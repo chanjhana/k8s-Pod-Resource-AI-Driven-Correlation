@@ -3,8 +3,9 @@ import {
   View, Text, StyleSheet, ScrollView, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useActiveAlert, useAlerts, useSensors, useApp } from '../../core/store/AppContext';
+import { useActiveAlert, useAlerts, useSensors, useApp, useDmdForecasts } from '../../core/store/AppContext';
 import AlertCard from '../../components/alerts/AlertCard';
+import DmdForecastCard from '../../components/alerts/DmdForecastCard';
 import RootCausePanel from '../../components/alerts/RootCausePanel';
 import SparklineChart from '../../components/ui/SparklineChart';
 import InvestigationModal from '../../components/alerts/InvestigationModal';
@@ -13,6 +14,7 @@ import { Colors, Typography, Spacing } from '../../components/ui/tokens';
 export default function AlertsScreen() {
   const activeAlert  = useActiveAlert();
   const alerts       = useAlerts();
+  const dmdForecasts = useDmdForecasts();
   const sensors      = useSensors();
   const { dispatch } = useApp();
   const [showModal, setShowModal]   = useState(false);
@@ -54,6 +56,19 @@ export default function AlertsScreen() {
             <Text style={styles.noAlertTitle}>All Systems Normal</Text>
             <Text style={styles.noAlertSub}>No active critical alerts.</Text>
           </View>
+        )}
+
+        {/* ── DMD Early Warnings ───────────────────────────────────────── */}
+        {dmdForecasts && dmdForecasts.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>DMD EARLY WARNING FORECASTS</Text>
+            {dmdForecasts.map(forecast => (
+              <DmdForecastCard
+                key={forecast.finding_id}
+                forecast={forecast}
+              />
+            ))}
+          </>
         )}
 
         {/* ── Live Metrics ─────────────────────────────────────────────── */}
