@@ -206,6 +206,9 @@ async def _broadcast_to_ws(message: Dict[str, Any]) -> None:
             dead.add(ws)
     _ws_clients.difference_update(dead)
 def _send_sms_if_configured(alert_data: Dict[str, Any]) -> None:
+    # Temporarily disabled to prevent draining free Twilio credits
+    log.info("Twilio SMS is temporarily disabled. Skipping SMS alert.")
+    return
     try:
         is_dmd = alert_data.get("is_dmd") is True
         
